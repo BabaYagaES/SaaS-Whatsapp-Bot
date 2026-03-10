@@ -135,7 +135,7 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
         const { to, message } = req.body;
 
         if (!to || !message) {
-            return res.status(400).json({ error: { message: 'to and message are required' } });
+            return res.status(400).json({ error: { message: 'Se requiere destinatario y mensaje' } });
         }
 
         const session = await prisma.whatsAppSession.findFirst({
@@ -153,54 +153,21 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
         const isActiveInMemory = whatsappManager.sessions.has(session.id);
 
         if (!isActiveInMemory) {
-            // Session exists in DB but not in memory - attempt auto-reconnect
+            // Session is in DB but NOT in memory (server restarted, etc.)
+            // Update DB to reflect real status
             if (session.status === 'CONNECTED') {
-                console.log(`[WhatsApp] Session ${session.id} is CONNECTED in DB but not in memory. Attempting reconnect...`);
-
-                try {
-                    await whatsappManager.createSession(req.user.id, session.id);
-
-                    // Wait a bit for initialization
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-
-                    // Check again
-                    if (!whatsappManager.sessions.has(session.id)) {
-                        // Reconnect is still in progress or failed
-                        await prisma.whatsAppSession.update({
-                            where: { id: session.id },
-                            data: { status: 'RECONNECTING' },
-                        });
-
-                        return res.status(503).json({
-                            error: {
-                                message: 'La sesión de WhatsApp se está reconectando. Espera unos segundos e intenta de nuevo.',
-                                code: 'SESSION_RECONNECTING',
-                            },
-                        });
-                    }
-                } catch (reconnectErr) {
-                    console.error('[WhatsApp] Auto-reconnect failed:', reconnectErr);
-
-                    await prisma.whatsAppSession.update({
-                        where: { id: session.id },
-                        data: { status: 'DISCONNECTED' },
-                    });
-
-                    return res.status(503).json({
-                        error: {
-                            message: 'La sesión de WhatsApp se desconectó. Ve a WhatsApp y reconecta escaneando el código QR.',
-                            code: 'SESSION_DISCONNECTED',
-                        },
-                    });
-                }
-            } else {
-                return res.status(400).json({
-                    error: {
-                        message: `La sesión no está conectada (estado: ${session.status}). Ve a WhatsApp y conecta escaneando el código QR.`,
-                        code: 'SESSION_NOT_CONNECTED',
-                    },
+                await prisma.whatsAppSession.update({
+                    where: { id: session.id },
+                    data: { status: 'DISCONNECTED' },
                 });
             }
+
+            return res.status(400).json({
+                error: {
+                    message: 'Tu sesión de WhatsApp se desconectó. Ve a la sección WhatsApp y reconecta escaneando el código QR.',
+                    code: 'SESSION_DISCONNECTED',
+                },
+            });
         }
 
         // Send via WhatsApp
@@ -234,20 +201,25 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
             data: savedMessage,
         });
     } catch (err) {
-        console.error('[WhatsApp] Send message error:', err.message);
+        console.error('[WhatsApp] Send message error:', err.message || err);
 
-        // If the error is about session not found in manager, give a clear message
+        // If the error is about session not found in manager
         if (err.message?.includes('not found') || err.message?.includes('not connected')) {
-            return res.status(503).json({
+            return res.status(400).json({
                 error: {
-                    message: 'La sesión de WhatsApp no está activa. Ve a WhatsApp y reconecta.',
+                    message: 'La sesión de WhatsApp no está activa. Ve a la sección WhatsApp y reconecta.',
                     code: 'SESSION_INACTIVE',
                 },
             });
         }
 
-        res.status(500).json({ error: { message: 'Error al enviar el mensaje: ' + err.message } });
+        res.status(500).json({
+            error: {
+                message: 'Error al enviar el mensaje. Verifica que tu sesión de WhatsApp esté activa.',
+            },
+        });
     }
+}
 });
 
 // ==========================================
