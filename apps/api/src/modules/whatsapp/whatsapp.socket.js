@@ -49,8 +49,8 @@ function setupWhatsAppEvents(io) {
     });
 
     // Incoming message
-    whatsappManager.on('message', async ({ userId, sessionId, from, body, timestamp }) => {
-        console.log(`[WS] New message for user ${userId} from ${from}`);
+    whatsappManager.on('message', async ({ userId, sessionId, from, originalFrom, contactName, body, timestamp }) => {
+        console.log(`[WS] New message for user ${userId} from ${from} (${contactName || 'no name'})`);
 
         try {
             const phone = from.replace(/@c\.us$/, '').replace(/@lid$/, '').replace(/@g\.us$/, '');
@@ -62,7 +62,17 @@ function setupWhatsAppEvents(io) {
 
             if (!contact) {
                 contact = await prisma.contact.create({
-                    data: { userId, phone },
+                    data: {
+                        userId,
+                        phone,
+                        name: contactName || null
+                    },
+                });
+            } else if (!contact.name && contactName) {
+                // If we found the contact but it didn't have a name, update it with the new name
+                contact = await prisma.contact.update({
+                    where: { id: contact.id },
+                    data: { name: contactName }
                 });
             }
 

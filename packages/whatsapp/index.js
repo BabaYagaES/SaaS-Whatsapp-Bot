@@ -88,7 +88,7 @@ class WhatsAppManager extends EventEmitter {
         });
 
         // Incoming message
-        client.on('message', (message) => {
+        client.on('message', async (message) => {
             // Filter out status broadcasts, group messages, and system messages
             if (
                 message.from === 'status@broadcast' ||
@@ -101,10 +101,27 @@ class WhatsAppManager extends EventEmitter {
             }
 
             console.log(`[WhatsApp] Message received in session ${sessionId} from ${message.from}`);
+
+            // Extract real contact information (to avoid using LIDs and get pushname)
+            let realPhone = message.from;
+            let contactName = null;
+            try {
+                const contact = await message.getContact();
+                if (contact) {
+                    // contact.number is the real phone without suffix
+                    if (contact.number) realPhone = `${contact.number}@c.us`;
+                    contactName = contact.name || contact.pushname || null;
+                }
+            } catch (err) {
+                console.error('[WhatsApp] Error fetching contact details:', err.message);
+            }
+
             this.emit('message', {
                 userId,
                 sessionId,
-                from: message.from,
+                from: realPhone, // Use the real resolved phone
+                originalFrom: message.from, // Keep the original just in case
+                contactName,
                 to: message.to,
                 body: message.body,
                 timestamp: message.timestamp,
