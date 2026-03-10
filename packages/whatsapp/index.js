@@ -140,7 +140,7 @@ class WhatsAppManager extends EventEmitter {
     /**
      * Send a message through a specific session
      * @param {string} sessionId 
-     * @param {string} to - Phone number with country code (e.g., '521234567890@c.us')
+     * @param {string} to - Phone number with country code (e.g., '521234567890@c.us' or '521234567890@lid')
      * @param {string} message 
      * @returns {Promise<object>}
      */
@@ -151,10 +151,20 @@ class WhatsAppManager extends EventEmitter {
         }
 
         // Ensure proper WhatsApp ID format
-        const chatId = to.includes('@c.us') ? to : `${to}@c.us`;
+        // WhatsApp has two formats: @c.us (phone numbers) and @lid (Linked IDs)
+        // We need to try the right format for the contact
+        let chatId;
+        if (to.includes('@c.us') || to.includes('@lid') || to.includes('@g.us')) {
+            chatId = to;
+        } else {
+            chatId = `${to}@c.us`;
+        }
+
+        console.log(`[WhatsApp] Sending message to: ${chatId} via session ${sessionId}`);
 
         try {
             const sentMessage = await session.client.sendMessage(chatId, message);
+            console.log(`[WhatsApp] Message sent successfully to ${chatId}`);
             return {
                 id: sentMessage.id._serialized,
                 to: chatId,
@@ -162,7 +172,25 @@ class WhatsAppManager extends EventEmitter {
                 timestamp: sentMessage.timestamp,
             };
         } catch (err) {
-            console.error(`[WhatsApp] Error sending message:`, err);
+            // If sending with @c.us fails with "No LID for user", try with @lid format
+            if (err.message?.includes('No LID') && chatId.includes('@c.us')) {
+                const lidChatId = chatId.replace('@c.us', '@lid');
+                console.log(`[WhatsApp] Retrying with LID format: ${lidChatId}`);
+                try {
+                    const sentMessage = await session.client.sendMessage(lidChatId, message);
+                    console.log(`[WhatsApp] Message sent successfully to ${lidChatId}`);
+                    return {
+                        id: sentMessage.id._serialized,
+                        to: lidChatId,
+                        body: message,
+                        timestamp: sentMessage.timestamp,
+                    };
+                } catch (retryErr) {
+                    console.error(`[WhatsApp] Retry with @lid also failed:`, retryErr.message || retryErr);
+                    throw retryErr;
+                }
+            }
+            console.error(`[WhatsApp] Error sending message to ${chatId}:`, err.message || err);
             throw err;
         }
     }
