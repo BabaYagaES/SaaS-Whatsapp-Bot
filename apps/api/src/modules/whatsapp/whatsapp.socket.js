@@ -53,7 +53,7 @@ function setupWhatsAppEvents(io) {
         console.log(`[WS] New message for user ${userId} from ${from}`);
 
         try {
-            const phone = from.replace('@c.us', '');
+            const phone = from.replace(/@c\.us$/, '').replace(/@lid$/, '').replace(/@g\.us$/, '');
 
             // Find or create contact
             let contact = await prisma.contact.findFirst({
@@ -151,7 +151,7 @@ async function processAutomations(userId, sessionId, from, body) {
                     await whatsappManager.sendMessage(sessionId, from, auto.response);
 
                     // Save auto-reply as outbound message
-                    const phone = from.replace('@c.us', '');
+                    const phone = from.replace(/@c\.us$/, '').replace(/@lid$/, '').replace(/@g\.us$/, '');
                     const contact = await prisma.contact.findFirst({
                         where: { userId, phone },
                     });

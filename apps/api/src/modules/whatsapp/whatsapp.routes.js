@@ -174,7 +174,7 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
         const result = await whatsappManager.sendMessage(session.id, to, message);
 
         // Find or create contact
-        const phone = to.replace('@c.us', '');
+        const phone = to.replace(/@c\.us$/, '').replace(/@lid$/, '').replace(/@g\.us$/, '');
         let contact = await prisma.contact.findFirst({
             where: { userId: req.user.id, phone },
         });
@@ -201,6 +201,10 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
             data: savedMessage,
         });
     } catch (err) {
+        // Log full error to file for debugging
+        const fs = require('fs');
+        const logEntry = `[${new Date().toISOString()}] Send Error:\n  to: ${req.body.to}\n  sessionId: ${req.params.id}\n  error: ${err.message}\n  stack: ${err.stack}\n\n`;
+        fs.appendFileSync('send_errors.log', logEntry);
         console.error('[WhatsApp] Send message error:', err.message || err);
 
         // If the error is about session not found in manager
@@ -219,7 +223,6 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
             },
         });
     }
-}
 });
 
 // ==========================================
