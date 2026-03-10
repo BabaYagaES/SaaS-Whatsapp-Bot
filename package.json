@@ -1,0 +1,21 @@
+{
+  "name": "saas-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SaaS WhatsApp Automation Platform",
+  "scripts": {
+    "dev:api": "cd apps/api && npm run dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "dev:worker": "cd apps/worker && npm run dev",
+    "build:api": "cd apps/api && npm run build",
+    "build:web": "cd apps/web && npm run build",
+    "db:generate": "cd packages/database && npx prisma generate",
+    "db:migrate": "cd packages/database && npx prisma migrate dev",
+    "db:push": "cd packages/database && npx prisma db push",
+    "db:studio": "cd packages/database && npx prisma studio",
+    "install:all": "npm install && cd apps/api && npm install && cd ../web && npm install && cd ../worker && npm install && cd ../../packages/database && npm install && cd ../whatsapp && npm install"
+  },
+  "keywords": ["whatsapp", "saas", "automation"],
+  "author": "",
+  "license": "ISC"
+}

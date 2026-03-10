@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe Técnico — WhatsBot SaaS</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --whatsapp: #25D366;
+            --dark-950: #020617;
+            --dark-900: #0f172a;
+            --dark-800: #1e293b;
+            --dark-700: #334155;
+            --dark-600: #475569;
+            --dark-400: #94a3b8;
+            --dark-300: #cbd5e1;
+            --dark-200: #e2e8f0;
+            --dark-100: #f1f5f9;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--dark-950);
+            color: var(--dark-200);
+            line-height: 1.7;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 50px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 50px 0 40px;
+            border-bottom: 1px solid var(--dark-700);
+            margin-bottom: 40px;
+        }
+        .header .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .header .logo-icon {
+            width: 48px; height: 48px;
+            background: var(--whatsapp);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px;
+        }
+        .header .logo-text {
+            font-size: 32px; font-weight: 800;
+            color: white;
+        }
+        .header .logo-text span { color: var(--whatsapp); }
+        .header h1 {
+            font-size: 28px; font-weight: 700;
+            color: white; margin-bottom: 8px;
+        }
+        .header .meta {
+            color: var(--dark-400);
+            font-size: 14px;
+        }
+        .header .badge {
+            display: inline-block;
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 12px;
+        }
+
+        /* Sections */
+        h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+            margin: 45px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h2 .num {
+            background: var(--primary);
+            color: white;
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        h3 {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--dark-100);
+            margin: 25px 0 12px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 24px;
+            font-size: 13.5px;
+        }
+        thead th {
+            background: var(--dark-800);
+            color: var(--dark-100);
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        thead th:first-child { border-radius: 8px 0 0 0; }
+        thead th:last-child { border-radius: 0 8px 0 0; }
+        tbody td {
+            padding: 9px 14px;
+            border-bottom: 1px solid var(--dark-800);
+            color: var(--dark-300);
+        }
+        tbody tr:hover { background: rgba(99, 102, 241, 0.05); }
+        td code {
+            background: var(--dark-800);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 12.5px;
+            color: var(--primary);
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--dark-900);
+            border: 1px solid var(--dark-700);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 16px 0 24px;
+            font-size: 12.5px;
+            line-height: 1.6;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            color: var(--dark-300);
+        }
+
+        /* Info boxes */
+        .info-box {
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin: 16px 0;
+            font-size: 13.5px;
+        }
+        .info-box.note {
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 4px solid var(--primary);
+            color: var(--dark-200);
+        }
+        .info-box.tip {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+        }
+        .info-box.important {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid #f59e0b;
+        }
+        .info-box strong { color: white; }
+
+        /* File tree */
+        .file-tree {
+            background: var(--dark-900);
+            border: 1px solid var(--dark-700);
+            border-radius: 12px;
+            padding: 24px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            color: var(--dark-400);
+            margin: 16px 0 24px;
+        }
+        .file-tree .folder { color: #60a5fa; font-weight: 600; }
+        .file-tree .file { color: var(--dark-300); }
+        .file-tree .comment { color: var(--dark-600); font-style: italic; }
+
+        /* Feature cards */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 16px 0 24px;
+        }
+        .feature-card {
+            background: var(--dark-900);
+            border: 1px solid var(--dark-700);
+            border-radius: 12px;
+            padding: 18px;
+        }
+        .feature-card h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 6px;
+        }
+        .feature-card p {
+            font-size: 12.5px;
+            color: var(--dark-400);
+            line-height: 1.5;
+        }
+
+        /* Priority badges */
+        .priority-high {
+            display: inline-block;
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .priority-med {
+            display: inline-block;
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .priority-low {
+            display: inline-block;
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Status badges */
+        .status { display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+        .status-yes { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .status-no { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        /* Flow */
+        .flow-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin: 10px 0;
+        }
+        .flow-num {
+            width: 28px; height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .flow-text { font-size: 14px; color: var(--dark-300); }
+
+        /* Page list */
+        .page-card {
+            background: var(--dark-900);
+            border: 1px solid var(--dark-700);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 10px 0;
+        }
+        .page-card h4 { color: white; font-size: 15px; margin-bottom: 6px; }
+        .page-card p { color: var(--dark-400); font-size: 13px; }
+        .page-card .route { color: var(--primary); font-family: monospace; font-size: 12px; }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 0 30px;
+            margin-top: 50px;
+            border-top: 1px solid var(--dark-700);
+            color: var(--dark-600);
+            font-size: 13px;
+        }
+
+        p { margin: 8px 0; font-size: 14px; }
+        ul, ol { margin: 8px 0 16px 24px; }
+        li { margin: 4px 0; font-size: 13.5px; color: var(--dark-300); }
+
+        /* Print styles */
+        @media print {
+            body { background: white; color: #1a1a1a; }
+            .container { padding: 20px; }
+            .header { padding: 20px 0; }
+            h2 { color: #1a1a1a; border-color: var(--primary); }
+            h3 { color: #333; }
+            pre { border-color: #ddd; background: #f8f9fa; color: #333; }
+            .file-tree { background: #f8f9fa; border-color: #ddd; }
+            table { font-size: 12px; }
+            thead th { background: #f0f0f0; color: #333; }
+            tbody td { color: #444; border-color: #eee; }
+            td code { background: #f0f0f0; color: var(--primary); }
+            .feature-card, .page-card { background: #f8f9fa; border-color: #ddd; }
+            .feature-card h4, .page-card h4 { color: #1a1a1a; }
+            .feature-card p, .page-card p { color: #666; }
+            .info-box { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .header .logo-text { color: #1a1a1a; }
+            .file-tree .folder { color: #2563eb; }
+            .file-tree .file { color: #444; }
+            .flow-text { color: #444; }
+            .dark-300, li, p { color: #444; }
+        }
+
+        @page { margin: 1.5cm; }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">💬</div>
+                <div class="logo-text">Whats<span>Bot</span></div>
+            </div>
+            <h1>📋 Informe Técnico del Proyecto</h1>
+            <p class="meta">9 de Marzo, 2026 &nbsp;•&nbsp; Versión 1.0.0</p>
+            <div class="badge">✅ MVP Funcional</div>
+        </div>
+
+        <!-- 1. RESUMEN -->
+        <h2><span class="num">1</span> Resumen Ejecutivo</h2>
+        <p>Se construyó una plataforma SaaS completa para automatización de WhatsApp llamada <strong style="color:white">WhatsBot</strong>. El sistema permite a los usuarios:</p>
+        <ul>
+            <li>Conectar su cuenta de WhatsApp mediante código QR</li>
+            <li>Enviar y recibir mensajes en tiempo real</li>
+            <li>Gestionar contactos con tags y búsqueda</li>
+            <li>Configurar respuestas automáticas basadas en palabras clave</li>
+            <li>Ver estadísticas de uso desde un dashboard profesional</li>
+        </ul>
+        <p>La arquitectura es un <strong style="color:white">monorepo</strong> con separación clara entre frontend, backend, motor de WhatsApp y base de datos.</p>
+
+        <!-- 2. STACK -->
+        <h2><span class="num">2</span> Stack Tecnológico</h2>
+        
+        <h3>Frontend (Dashboard)</h3>
+        <table>
+            <thead><tr><th>Tecnología</th><th>Versión</th><th>Propósito</th></tr></thead>
+            <tbody>
+                <tr><td><strong style="color:white">Next.js</strong></td><td>16.1.6</td><td>Framework React con App Router</td></tr>
+                <tr><td><strong style="color:white">React</strong></td><td>19.x</td><td>Librería de UI</td></tr>
+                <tr><td><strong style="color:white">TailwindCSS</strong></td><td>4.x</td><td>Estilos CSS (dark theme)</td></tr>
+                <tr><td><strong style="color:white">Zustand</strong></td><td>5.x</td><td>Estado global (auth, UI)</td></tr>
+                <tr><td><strong style="color:white">Socket.IO Client</strong></td><td>4.x</td><td>Comunicación en tiempo real</td></tr>
+                <tr><td><strong style="color:white">Lucide React</strong></td><td>—</td><td>Iconos SVG</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Backend (API)</h3>
+        <table>
+            <thead><tr><th>Tecnología</th><th>Propósito</th></tr></thead>
+            <tbody>
+                <tr><td><strong style="color:white">Node.js 22</strong></td><td>Runtime del servidor</td></tr>
+                <tr><td><strong style="color:white">Express.js</strong></td><td>Framework HTTP</td></tr>
+                <tr><td><strong style="color:white">Socket.IO</strong></td><td>WebSocket server para tiempo real</td></tr>
+                <tr><td><strong style="color:white">Prisma ORM</strong></td><td>Queries type-safe, migraciones</td></tr>
+                <tr><td><strong style="color:white">bcryptjs</strong></td><td>Hashing de contraseñas</td></tr>
+                <tr><td><strong style="color:white">jsonwebtoken</strong></td><td>Autenticación JWT</td></tr>
+                <tr><td><strong style="color:white">Helmet + CORS</strong></td><td>Seguridad HTTP</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Motor WhatsApp + Base de Datos</h3>
+        <table>
+            <thead><tr><th>Tecnología</th><th>Propósito</th></tr></thead>
+            <tbody>
+                <tr><td><strong style="color:white">whatsapp-web.js</strong></td><td>Cliente de WhatsApp Web (Puppeteer)</td></tr>
+                <tr><td><strong style="color:white">SQLite</strong></td><td>Base de datos local (sin Docker)</td></tr>
+                <tr><td><strong style="color:white">Prisma ORM</strong></td><td>Gestión de esquema y queries</td></tr>
+            </tbody>
+        </table>
+
+        <div class="info-box note">
+            <strong>💡 Nota:</strong> Se eligió SQLite para desarrollo local. Para producción, se puede migrar a PostgreSQL cambiando solo el <code>DATABASE_URL</code> y el provider en <code>schema.prisma</code>.
+        </div>
+
+        <!-- 3. ARQUITECTURA -->
+        <h2><span class="num">3</span> Arquitectura del Sistema</h2>
+        <pre>
+    ┌─────────────────────────────────────────────────────────┐
+    │                  🖥️  FRONTEND (:3000)                    │
+    │   Next.js 16  +  TailwindCSS  +  Zustand  +  Socket.IO │
+    └───────────────────────┬──────────────────────┬──────────┘
+                            │ HTTP REST            │ WebSocket
+                            ▼                      ▼
+    ┌─────────────────────────────────────────────────────────┐
+    │                  ⚙️  BACKEND API (:3001)                 │
+    │   Express.js  +  JWT Auth  +  Socket.IO Server          │
+    │                                                         │
+    │   📁 Módulos:                                            │
+    │   ├── auth/       → Register, Login, Me                 │
+    │   ├── users/      → Perfil, Stats                       │
+    │   ├── whatsapp/   → Sesiones, QR, Enviar                │
+    │   ├── contacts/   → CRUD + Búsqueda                     │
+    │   ├── messages/   → Conversaciones, Chat                │
+    │   └── automations/→ CRUD + Toggle                       │
+    └─────────┬───────────────────────────────┬───────────────┘
+              │ Prisma ORM                    │ Eventos
+              ▼                               ▼
+    ┌──────────────────┐         ┌─────────────────────────┐
+    │  💾 SQLite (DB)   │         │  📱 Motor WhatsApp       │
+    │   • Users         │         │   whatsapp-web.js        │
+    │   • Sessions      │         │   Puppeteer (headless)   │
+    │   • Contacts      │         │                         │
+    │   • Messages      │         │  Eventos emitidos:       │
+    │   • Automations   │         │   • qr → QR generado     │
+    └──────────────────┘         │   • ready → Conectado    │
+                                  │   • message → Mensaje    │
+                                  │   • disconnected         │
+                                  └─────────────────────────┘
+        </pre>
+
+        <!-- 4. ESTRUCTURA -->
+        <h2><span class="num">4</span> Estructura de Archivos</h2>
+        <div class="file-tree">
+<span class="folder">📁 SaaS Whatsapp Bot/</span>
+├── <span class="folder">📁 apps/</span>
+│   ├── <span class="folder">📁 api/</span>                         <span class="comment">← Backend Express.js</span>
+│   │   ├── <span class="folder">📁 prisma/</span>
+│   │   │   └── <span class="file">schema.prisma</span>           <span class="comment">← Esquema de base de datos</span>
+│   │   ├── <span class="folder">📁 src/</span>
+│   │   │   ├── <span class="file">index.js</span>                <span class="comment">← Punto de entrada del servidor</span>
+│   │   │   ├── <span class="folder">📁 config/</span>
+│   │   │   │   └── <span class="file">database.js</span>         <span class="comment">← Singleton Prisma client</span>
+│   │   │   ├── <span class="folder">📁 middlewares/</span>
+│   │   │   │   └── <span class="file">auth.middleware.js</span>   <span class="comment">← JWT verificación</span>
+│   │   │   └── <span class="folder">📁 modules/</span>
+│   │   │       ├── <span class="folder">📁 auth/</span>          <span class="comment">← Register, Login, Me</span>
+│   │   │       ├── <span class="folder">📁 users/</span>         <span class="comment">← Perfil, Stats</span>
+│   │   │       ├── <span class="folder">📁 whatsapp/</span>      <span class="comment">← Sesiones + Socket bridge</span>
+│   │   │       ├── <span class="folder">📁 contacts/</span>      <span class="comment">← CRUD contactos</span>
+│   │   │       ├── <span class="folder">📁 messages/</span>      <span class="comment">← Conversaciones, Chat</span>
+│   │   │       └── <span class="folder">📁 automations/</span>   <span class="comment">← CRUD automatizaciones</span>
+│   │   └── <span class="file">.env</span>                        <span class="comment">← Variables de entorno</span>
+│   │
+│   ├── <span class="folder">📁 web/</span>                         <span class="comment">← Frontend Next.js</span>
+│   │   └── <span class="folder">📁 src/</span>
+│   │       ├── <span class="folder">📁 app/</span>
+│   │       │   ├── <span class="file">layout.tsx</span>          <span class="comment">← Layout raíz + fuente</span>
+│   │       │   ├── <span class="file">globals.css</span>         <span class="comment">← Sistema de diseño</span>
+│   │       │   ├── <span class="file">page.tsx</span>            <span class="comment">← Landing page</span>
+│   │       │   ├── <span class="folder">📁 login/</span>          <span class="comment">← Login page</span>
+│   │       │   ├── <span class="folder">📁 register/</span>       <span class="comment">← Register page</span>
+│   │       │   └── <span class="folder">📁 dashboard/</span>
+│   │       │       ├── <span class="file">layout.tsx</span>      <span class="comment">← Sidebar + auth guard</span>
+│   │       │       ├── <span class="file">page.tsx</span>        <span class="comment">← Dashboard principal</span>
+│   │       │       ├── <span class="folder">📁 whatsapp/</span>    <span class="comment">← Sesiones WhatsApp</span>
+│   │       │       ├── <span class="folder">📁 conversations/</span><span class="comment">← Chat en tiempo real</span>
+│   │       │       ├── <span class="folder">📁 contacts/</span>    <span class="comment">← Grid contactos</span>
+│   │       │       ├── <span class="folder">📁 automations/</span> <span class="comment">← Automatizaciones</span>
+│   │       │       └── <span class="folder">📁 settings/</span>    <span class="comment">← Configuración</span>
+│   │       └── <span class="folder">📁 lib/</span>
+│   │           ├── <span class="file">api.ts</span>              <span class="comment">← Cliente API</span>
+│   │           ├── <span class="file">store.ts</span>            <span class="comment">← Zustand stores</span>
+│   │           └── <span class="file">socket.ts</span>           <span class="comment">← Socket.IO client</span>
+│   │
+│   └── <span class="folder">📁 worker/</span>                      <span class="comment">← Background jobs</span>
+│
+├── <span class="folder">📁 packages/</span>
+│   ├── <span class="folder">📁 database/</span>                    <span class="comment">← Prisma esquema maestro</span>
+│   └── <span class="folder">📁 whatsapp/</span>                    <span class="comment">← Motor WhatsApp</span>
+│
+├── <span class="folder">📁 infra/docker/</span>
+│   └── <span class="file">docker-compose.yml</span>              <span class="comment">← PostgreSQL + Redis</span>
+│
+├── <span class="file">.env</span> / <span class="file">.env.example</span>
+├── <span class="file">.gitignore</span>
+├── <span class="file">package.json</span>                        <span class="comment">← Scripts monorepo</span>
+└── <span class="file">README.md</span>
+        </div>
+
+        <!-- 5. BASE DE DATOS -->
+        <h2><span class="num">5</span> Base de Datos — 5 Modelos</h2>
+        
+        <table>
+            <thead><tr><th>Modelo</th><th>Campos clave</th><th>Relaciones</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong style="color:white">User</strong></td>
+                    <td>id, email, password, name, plan</td>
+                    <td>→ Sessions, Contacts, Automations</td>
+                </tr>
+                <tr>
+                    <td><strong style="color:white">WhatsAppSession</strong></td>
+                    <td>id, userId, sessionName, status, qrCode, phone</td>
+                    <td>→ User, Messages</td>
+                </tr>
+                <tr>
+                    <td><strong style="color:white">Contact</strong></td>
+                    <td>id, userId, phone, name, tags (JSON), notes</td>
+                    <td>→ User, Messages</td>
+                </tr>
+                <tr>
+                    <td><strong style="color:white">Message</strong></td>
+                    <td>id, sessionId, contactId, direction, body, status</td>
+                    <td>→ Session, Contact</td>
+                </tr>
+                <tr>
+                    <td><strong style="color:white">Automation</strong></td>
+                    <td>id, userId, name, trigger, response, matchType, enabled</td>
+                    <td>→ User</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box note">
+            <strong>Valores posibles:</strong><br>
+            • <strong>Plan:</strong> FREE, STARTER, PRO, ENTERPRISE<br>
+            • <strong>Status sesión:</strong> CONNECTED, DISCONNECTED, QR_READY<br>
+            • <strong>Direction:</strong> INBOUND, OUTBOUND<br>
+            • <strong>Status msg:</strong> PENDING, SENT, DELIVERED, READ, FAILED<br>
+            • <strong>MatchType:</strong> EXACT, CONTAINS, STARTS_WITH, REGEX
+        </div>
+
+        <!-- 6. API ENDPOINTS -->
+        <h2><span class="num">6</span> API Endpoints — 23 rutas</h2>
+
+        <h3>🔐 Autenticación <code>/api/auth</code></h3>
+        <table>
+            <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th><th>Auth</th></tr></thead>
+            <tbody>
+                <tr><td><code>POST</code></td><td><code>/api/auth/register</code></td><td>Crear cuenta nueva</td><td><span class="status status-no">No</span></td></tr>
+                <tr><td><code>POST</code></td><td><code>/api/auth/login</code></td><td>Iniciar sesión → JWT</td><td><span class="status status-no">No</span></td></tr>
+                <tr><td><code>GET</code></td><td><code>/api/auth/me</code></td><td>Obtener usuario actual</td><td><span class="status status-yes">Sí</span></td></tr>
+            </tbody>
+        </table>
+
+        <h3>👤 Usuarios <code>/api/users</code></h3>
+        <table>
+            <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td><code>PUT</code></td><td><code>/api/users/profile</code></td><td>Actualizar nombre/email</td></tr>
+                <tr><td><code>GET</code></td><td><code>/api/users/stats</code></td><td>Estadísticas del dashboard</td></tr>
+            </tbody>
+        </table>
+
+        <h3>📱 WhatsApp <code>/api/whatsapp</code></h3>
+        <table>
+            <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td><code>POST</code></td><td><code>/api/whatsapp/sessions</code></td><td>Crear sesión (genera QR)</td></tr>
+                <tr><td><code>GET</code></td><td><code>/api/whatsapp/sessions</code></td><td>Listar sesiones</td></tr>
+                <tr><td><code>GET</code></td><td><code>/api/whatsapp/sessions/:id</code></td><td>Detalle de sesión</td></tr>
+                <tr><td><code>DELETE</code></td><td><code>/api/whatsapp/sessions/:id</code></td><td>Eliminar sesión</td></tr>
+                <tr><td><code>POST</code></td><td><code>/api/whatsapp/sessions/:id/send</code></td><td>Enviar mensaje</td></tr>
+            </tbody>
+        </table>
+
+        <h3>👥 Contactos <code>/api/contacts</code></h3>
+        <table>
+            <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td><code>GET</code></td><td><code>/api/contacts</code></td><td>Listar (búsqueda, tags, paginación)</td></tr>
+                <tr><td><code>POST</code></td><td><code>/api/contacts</code></td><td>Crear contacto</td></tr>
+                <tr><td><code>PUT</code></td><td><code>/api/contacts/:id</code></td><td>Actualizar contacto</td></tr>
+                <tr><td><code>DELETE</code></td><td><code>/api/contacts/:id</code></td><td>Eliminar contacto</td></tr>
+            </tbody>
+        </table>
+
+        <h3>💬 Mensajes <code>/api/messages</code></h3>
+        <table>
+            <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td><code>GET</code></td><td><code>/api/messages</code></td><td>Listar mensajes</td></tr>
+                <tr><td><code>GET</code></td><td><code>/api/messages/conversations</code></td><td>Lista de conversaciones</td></tr>
+                <tr><td><code>GET</code></td><td><code>/api/messages/chat/:contactId</code></td><td>Historial con un contacto</td></tr>
+            </tbody>
+        </table>
+
+        <h3>🤖 Automatizaciones <code>/api/automations</code></h3>
+        <table>
+            <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td><code>GET</code></td><td><code>/api/automations</code></td><td>Listar automatizaciones</td></tr>
+                <tr><td><code>POST</code></td><td><code>/api/automations</code></td><td>Crear automatización</td></tr>
+                <tr><td><code>PUT</code></td><td><code>/api/automations/:id</code></td><td>Actualizar</td></tr>
+                <tr><td><code>PATCH</code></td><td><code>/api/automations/:id/toggle</code></td><td>Activar/desactivar</td></tr>
+                <tr><td><code>DELETE</code></td><td><code>/api/automations/:id</code></td><td>Eliminar</td></tr>
+            </tbody>
+        </table>
+
+        <!-- 7. EVENTOS SOCKET.IO -->
+        <h2><span class="num">7</span> Eventos en Tiempo Real (Socket.IO)</h2>
+        
+        <pre>
+  Usuario crea sesión
+       │
+       ▼
+  Motor WA genera QR ─────► Socket.IO ─────► Dashboard muestra QR
+       │
+  Usuario escanea QR con teléfono
+       │
+       ▼
+  Motor WA → "ready" ─────► Socket.IO ─────► Dashboard: "Conectado ✅"
+       │
+  Alguien envía un mensaje al WhatsApp del usuario
+       │
+       ▼
+  Motor WA → filtra (no broadcast/grupos)
+       │
+       ▼
+  API: Crea contacto si no existe
+  API: Guarda mensaje en DB
+  API: Verifica automatizaciones
+       │
+       ├── Si hay match → envía auto-respuesta
+       │
+       ▼
+  Socket.IO ─────► Dashboard: mensaje aparece en chat
+        </pre>
+
+        <table>
+            <thead><tr><th>Evento</th><th>Datos</th><th>Cuándo se emite</th></tr></thead>
+            <tbody>
+                <tr><td><code>whatsapp:qr</code></td><td>sessionId, qr (Data URL)</td><td>Nuevo QR para escanear</td></tr>
+                <tr><td><code>whatsapp:ready</code></td><td>sessionId, phone</td><td>Sesión conectada</td></tr>
+                <tr><td><code>whatsapp:disconnected</code></td><td>sessionId, reason</td><td>Sesión desconectada</td></tr>
+                <tr><td><code>whatsapp:message</code></td><td>sessionId, message</td><td>Mensaje entrante</td></tr>
+                <tr><td><code>whatsapp:error</code></td><td>sessionId, error</td><td>Error de autenticación</td></tr>
+            </tbody>
+        </table>
+
+        <!-- 8. PÁGINAS -->
+        <h2><span class="num">8</span> Páginas del Frontend (9 páginas)</h2>
+        
+        <div class="page-card">
+            <h4>🏠 Landing Page</h4>
+            <span class="route">/</span>
+            <p>Hero con "Automatiza tu WhatsApp Business", 3 feature cards con glassmorphism, botones CTA, navbar con logo. Redirige al dashboard si está autenticado.</p>
+        </div>
+        <div class="page-card">
+            <h4>🔐 Login</h4>
+            <span class="route">/login</span>
+            <p>Formulario con glassmorphism, iconos en inputs, botón gradiente, validación, estados de carga/error.</p>
+        </div>
+        <div class="page-card">
+            <h4>📝 Register</h4>
+            <span class="route">/register</span>
+            <p>Igual al login con campo adicional de nombre. Link a login.</p>
+        </div>
+        <div class="page-card">
+            <h4>📊 Dashboard</h4>
+            <span class="route">/dashboard</span>
+            <p>4 tarjetas de stats, acciones rápidas, checklist de inicio para nuevos usuarios. Skeleton loaders.</p>
+        </div>
+        <div class="page-card">
+            <h4>📱 WhatsApp</h4>
+            <span class="route">/dashboard/whatsapp</span>
+            <p>Crear sesión con nombre, QR en tiempo real, lista de sesiones con estado (🟢/🔴/📱), eliminar.</p>
+        </div>
+        <div class="page-card">
+            <h4>💬 Conversaciones</h4>
+            <span class="route">/dashboard/conversations</span>
+            <p>Split view: lista a la izquierda, chat a la derecha. Burbujas, timestamps, envío con Enter, tiempo real.</p>
+        </div>
+        <div class="page-card">
+            <h4>👥 Contactos</h4>
+            <span class="route">/dashboard/contacts</span>
+            <p>Grid de tarjetas con avatar, búsqueda, agregar manual, edición inline, tags como chips de colores.</p>
+        </div>
+        <div class="page-card">
+            <h4>🤖 Automatizaciones</h4>
+            <span class="route">/dashboard/automations</span>
+            <p>Crear/editar con vista previa trigger→respuesta, 4 tipos de match, toggle on/off, prioridad.</p>
+        </div>
+        <div class="page-card">
+            <h4>⚙️ Configuración</h4>
+            <span class="route">/dashboard/settings</span>
+            <p>Editar perfil, comparación de 4 planes con precios, sección de seguridad.</p>
+        </div>
+
+        <!-- 9. SEGURIDAD -->
+        <h2><span class="num">9</span> Seguridad Implementada</h2>
+        <table>
+            <thead><tr><th>Capa</th><th>Implementación</th></tr></thead>
+            <tbody>
+                <tr><td><strong style="color:white">Contraseñas</strong></td><td>bcryptjs con salt rounds: 12</td></tr>
+                <tr><td><strong style="color:white">Autenticación</strong></td><td>JWT con expiración configurable (7 días default)</td></tr>
+                <tr><td><strong style="color:white">Headers HTTP</strong></td><td>helmet (XSS, Content-Type sniffing, etc.)</td></tr>
+                <tr><td><strong style="color:white">CORS</strong></td><td>Solo permite requests del frontend</td></tr>
+                <tr><td><strong style="color:white">Middleware</strong></td><td>authenticate verifica JWT en rutas protegidas</td></tr>
+                <tr><td><strong style="color:white">Filtrado WA</strong></td><td>Broadcasts, status y grupos no se almacenan</td></tr>
+            </tbody>
+        </table>
+
+        <!-- 10. DISEÑO -->
+        <h2><span class="num">10</span> Sistema de Diseño</h2>
+        <table>
+            <thead><tr><th>Aspecto</th><th>Detalle</th></tr></thead>
+            <tbody>
+                <tr><td><strong style="color:white">Tema</strong></td><td>Dark mode (fondo #020617)</td></tr>
+                <tr><td><strong style="color:white">Color primario</strong></td><td>Indigo/Violeta (#6366f1 → #4f46e5)</td></tr>
+                <tr><td><strong style="color:white">Color acento</strong></td><td>Verde WhatsApp (#25D366)</td></tr>
+                <tr><td><strong style="color:white">Tipografía</strong></td><td>Inter (Google Fonts, 300-800)</td></tr>
+                <tr><td><strong style="color:white">Efectos</strong></td><td>Glassmorphism, gradientes, backdrop-blur</td></tr>
+                <tr><td><strong style="color:white">Animaciones</strong></td><td>fadeIn, slideIn, pulse-glow, float</td></tr>
+                <tr><td><strong style="color:white">Chat bubbles</strong></td><td>Bordes asimétricos para in/out</td></tr>
+                <tr><td><strong style="color:white">Scrollbar</strong></td><td>Custom thin (6px)</td></tr>
+            </tbody>
+        </table>
+
+        <!-- 11. FLUJO -->
+        <h2><span class="num">11</span> Flujo Principal del Usuario</h2>
+        <div class="flow-step"><div class="flow-num">1</div><div class="flow-text">El usuario abre <code>http://localhost:3000</code> y ve la landing page</div></div>
+        <div class="flow-step"><div class="flow-num">2</div><div class="flow-text">Se registra con email y contraseña</div></div>
+        <div class="flow-step"><div class="flow-num">3</div><div class="flow-text">Entra al Dashboard → ve stats vacíos y checklist de inicio</div></div>
+        <div class="flow-step"><div class="flow-num">4</div><div class="flow-text">Va a WhatsApp → crea una sesión → aparece el código QR</div></div>
+        <div class="flow-step"><div class="flow-num">5</div><div class="flow-text">Escanea el QR con su teléfono → sesión se marca como "Conectado"</div></div>
+        <div class="flow-step"><div class="flow-num">6</div><div class="flow-text">Cuando alguien le escribe, el mensaje aparece en tiempo real en Conversaciones</div></div>
+        <div class="flow-step"><div class="flow-num">7</div><div class="flow-text">Si hay automatización configurada con match, se envía auto-respuesta</div></div>
+        <div class="flow-step"><div class="flow-num">8</div><div class="flow-text">Los contactos se crean automáticamente al recibir mensajes</div></div>
+
+        <!-- 12. INICIAR -->
+        <h2><span class="num">12</span> Cómo Iniciar el Proyecto</h2>
+        <pre>
+# Terminal 1 — Backend API
+cd apps/api
+npm run dev
+# → http://localhost:3001
+
+# Terminal 2 — Frontend
+cd apps/web
+npm run dev
+# → http://localhost:3000
+
+# (Opcional) Terminal 3 — Worker
+cd apps/worker
+npm run dev
+        </pre>
+        <div class="info-box important">
+            <strong>⚠️ Importante:</strong> No se necesita Docker para desarrollo. La base de datos SQLite se crea automáticamente en <code>apps/api/prisma/dev.db</code>.
+        </div>
+
+        <!-- 13. ROADMAP -->
+        <h2><span class="num">13</span> Roadmap — Features Pendientes</h2>
+
+        <h3><span class="priority-high">Prioridad Alta</span></h3>
+        <table>
+            <thead><tr><th>Feature</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td>Envío masivo</td><td>Campañas de mensajes a múltiples contactos</td></tr>
+                <tr><td>Migrar a PostgreSQL</td><td>Para producción (Docker o servicio cloud)</td></tr>
+                <tr><td>Rate limiting</td><td>express-rate-limit para proteger la API</td></tr>
+                <tr><td>Validación robusta</td><td>express-validator en todos los endpoints</td></tr>
+                <tr><td>Manejo de media</td><td>Enviar/recibir imágenes, documentos, audio</td></tr>
+            </tbody>
+        </table>
+
+        <h3><span class="priority-med">Prioridad Media</span></h3>
+        <table>
+            <thead><tr><th>Feature</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td>Plantillas de mensajes</td><td>Mensajes pre-escritos reutilizables</td></tr>
+                <tr><td>Grupos de contactos</td><td>Segmentación para campañas</td></tr>
+                <tr><td>Métricas avanzadas</td><td>Gráficas de mensajes por día/hora</td></tr>
+                <tr><td>Exportar contactos</td><td>CSV / Excel</td></tr>
+                <tr><td>Programar mensajes</td><td>Enviar a una hora específica</td></tr>
+                <tr><td>Multi-idioma</td><td>Soporte inglés / español</td></tr>
+            </tbody>
+        </table>
+
+        <h3><span class="priority-low">Prioridad Baja</span></h3>
+        <table>
+            <thead><tr><th>Feature</th><th>Descripción</th></tr></thead>
+            <tbody>
+                <tr><td>Sistema de pagos</td><td>Stripe para planes STARTER / PRO / ENTERPRISE</td></tr>
+                <tr><td>API pública</td><td>Webhooks para integración con terceros</td></tr>
+                <tr><td>Chatbot con IA</td><td>Respuestas con GPT en vez de keywords</td></tr>
+                <tr><td>Notificaciones push</td><td>Alertas de mensajes nuevos</td></tr>
+                <tr><td>Logs de actividad</td><td>Historial de acciones del usuario</td></tr>
+                <tr><td>Deploy</td><td>Docker + CI/CD, Vercel + DigitalOcean</td></tr>
+            </tbody>
+        </table>
+
+        <!-- 14. DECISIONES -->
+        <h2><span class="num">14</span> Decisiones Técnicas</h2>
+        <table>
+            <thead><tr><th>Decisión</th><th>Razón</th></tr></thead>
+            <tbody>
+                <tr><td><strong style="color:white">Express.js</strong> en vez de NestJS</td><td>Más rápido para MVP, menor complejidad inicial</td></tr>
+                <tr><td><strong style="color:white">SQLite</strong> en vez de PostgreSQL</td><td>Sin dependencia de Docker; migración trivial</td></tr>
+                <tr><td><strong style="color:white">Zustand</strong> en vez de Redux</td><td>API simple, ligero, perfecto para esta escala</td></tr>
+                <tr><td><strong style="color:white">Socket.IO</strong> para real-time</td><td>Mayor compatibilidad, maneja reconexiones auto</td></tr>
+                <tr><td><strong style="color:white">Monorepo</strong> simple</td><td>Packages compartidos sin overhead de Turborepo</td></tr>
+                <tr><td><strong style="color:white">Strings</strong> en vez de Enums</td><td>SQLite no soporta enums; validación en app</td></tr>
+                <tr><td><strong style="color:white">Tags como JSON</strong></td><td>SQLite no tiene arrays nativos; JSON.parse()</td></tr>
+            </tbody>
+        </table>
+
+        <div class="info-box tip">
+            <strong>🔧 Para agregar funcionalidades:</strong><br>
+            • <strong>Nuevas rutas API:</strong> Crear en <code>apps/api/src/modules/[nombre]/</code> → registrar en <code>index.js</code><br>
+            • <strong>Nuevas páginas:</strong> Crear en <code>apps/web/src/app/dashboard/[nombre]/page.tsx</code><br>
+            • <strong>Nuevos modelos:</strong> Editar <code>prisma/schema.prisma</code> → ejecutar <code>npx prisma db push</code><br>
+            • <strong>Nuevos eventos WA:</strong> Editar <code>packages/whatsapp/index.js</code> + <code>whatsapp.socket.js</code>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <p><strong style="color:var(--dark-300)">WhatsBot</strong> — SaaS WhatsApp Automation Platform</p>
+            <p>Generado el 9 de Marzo, 2026</p>
+        </div>
+    </div>
+</body>
+</html>

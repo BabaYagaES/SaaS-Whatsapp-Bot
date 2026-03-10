@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+dist/
+build/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WhatsApp sessions
+whatsapp-sessions/
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Prisma
+packages/database/prisma/migrations/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/

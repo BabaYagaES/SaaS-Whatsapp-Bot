@@ -1,0 +1,10 @@
+{
+    "name": "@saas-whatsapp/whatsapp",
+    "version": "1.0.0",
+    "main": "index.js",
+    "dependencies": {
+        "whatsapp-web.js": "^1.23.0",
+        "qrcode": "^1.5.3",
+        "events": "^3.3.0"
+    }
+}
