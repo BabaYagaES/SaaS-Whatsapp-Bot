@@ -1,0 +1,119 @@
+const mysql = require('mysql2/promise');
+const crypto = require('crypto');
+
+const pool = mysql.createPool({
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'rootpass',
+    database: process.env.DB_NAME || 'saas_whatsapp',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+});
+
+function generateId() {
+    return crypto.randomUUID();
+}
+
+// Convert snake_case DB columns to camelCase for API responses
+function toCamelCase(row) {
+    if (!row) return null;
+    const result = {};
+    for (const [key, value] of Object.entries(row)) {
+        const camel = key.replace(/_([a-z])/g, (_, l) => l.toUpperCase());
+        result[camel] = value;
+    }
+    return result;
+}
+
+function rowsToCamel(rows) {
+    return rows.map(toCamelCase);
+}
+
+async function initDatabase() {
+    const conn = await pool.getConnection();
+    try {
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id VARCHAR(36) PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                name VARCHAR(255),
+                plan VARCHAR(50) DEFAULT 'FREE',
+                avatar TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                session_name VARCHAR(255) NOT NULL,
+                status VARCHAR(50) DEFAULT 'DISCONNECTED',
+                qr_code LONGTEXT,
+                phone VARCHAR(50),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS contacts (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                phone VARCHAR(255) NOT NULL,
+                name VARCHAR(255),
+                tags TEXT,
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_user_phone (user_id, phone)
+            )
+        `);
+
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS messages (
+                id VARCHAR(36) PRIMARY KEY,
+                session_id VARCHAR(36) NOT NULL,
+                contact_id VARCHAR(36),
+                direction VARCHAR(20) NOT NULL,
+                body TEXT NOT NULL,
+                media_url TEXT,
+                status VARCHAR(50) DEFAULT 'SENT',
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES whatsapp_sessions(id) ON DELETE CASCADE,
+                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
+                INDEX idx_session_id (session_id),
+                INDEX idx_contact_id (contact_id)
+            )
+        `);
+
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS automations (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                \`trigger\` TEXT NOT NULL,
+                response TEXT NOT NULL,
+                match_type VARCHAR(50) DEFAULT 'CONTAINS',
+                enabled BOOLEAN DEFAULT TRUE,
+                priority INT DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+
+        console.log('[DB] Tables initialized successfully');
+    } finally {
+        conn.release();
+    }
+}
+
+module.exports = { pool, generateId, toCamelCase, rowsToCamel, initDatabase };

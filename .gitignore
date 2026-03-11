@@ -28,7 +28,7 @@ whatsapp-sessions/
 .wwebjs_cache/
 
 # Prisma
-packages/database/prisma/migrations/
+prisma/migrations/
 
 # Logs
 *.log
