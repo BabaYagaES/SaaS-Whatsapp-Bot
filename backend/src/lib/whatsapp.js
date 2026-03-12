@@ -7,30 +7,69 @@ const fs = require('fs');
 class WhatsAppManager extends EventEmitter {
     constructor() {
         super();
-        this.sessions = new Map(); // userId -> Client instance
+        this.sessions = new Map();
+        this.sessionPath = path.resolve(process.cwd(), 'whatsapp-sessions');
+    }
+
+    getSessionDir() {
+        if (!fs.existsSync(this.sessionPath)) {
+            fs.mkdirSync(this.sessionPath, { recursive: true });
+        }
+        return this.sessionPath;
     }
 
     /**
-     * Create a new WhatsApp session for a user
-     * @param {string} userId 
-     * @param {string} sessionId 
-     * @returns {Promise<void>}
+     * Remove session folder from disk
      */
+    removeSessionFiles(sessionId) {
+        const folder = path.join(this.sessionPath, `session-${sessionId}`);
+        if (fs.existsSync(folder)) {
+            fs.rmSync(folder, { recursive: true, force: true });
+            console.log(`[WhatsApp] Cleaned session folder: session-${sessionId}`);
+        }
+    }
+
+    /**
+     * Clean up orphaned session folders that don't exist in DB
+     */
+    async cleanOrphanedSessions(activeSessionIds) {
+        try {
+            const sessDir = this.getSessionDir();
+            const folders = fs.readdirSync(sessDir).filter(f =>
+                f.startsWith('session-') && fs.statSync(path.join(sessDir, f)).isDirectory()
+            );
+
+            let cleaned = 0;
+            for (const folder of folders) {
+                const id = folder.replace('session-', '');
+                if (!activeSessionIds.includes(id)) {
+                    fs.rmSync(path.join(sessDir, folder), { recursive: true, force: true });
+                    cleaned++;
+                    console.log(`[WhatsApp] Removed orphaned folder: ${folder}`);
+                }
+            }
+            if (cleaned > 0) {
+                console.log(`[WhatsApp] Cleaned ${cleaned} orphaned session folder(s)`);
+            }
+        } catch (err) {
+            console.error('[WhatsApp] Error cleaning orphaned sessions:', err.message);
+        }
+    }
+
     async createSession(userId, sessionId) {
         if (this.sessions.has(sessionId)) {
             console.log(`[WhatsApp] Session ${sessionId} already exists`);
             return;
         }
 
-        const sessionPath = path.resolve(process.cwd(), 'whatsapp-sessions');
-        if (!fs.existsSync(sessionPath)) {
-            fs.mkdirSync(sessionPath, { recursive: true });
-        }
+        const sessDir = this.getSessionDir();
+        console.log(`[WhatsApp] Initializing session ${sessionId}...`);
+        const startTime = Date.now();
 
         const client = new Client({
             authStrategy: new LocalAuth({
                 clientId: sessionId,
-                dataPath: sessionPath,
+                dataPath: sessDir,
             }),
             puppeteer: {
                 headless: true,
@@ -41,6 +80,7 @@ class WhatsAppManager extends EventEmitter {
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
+                    '--single-process',
                     '--disable-gpu',
                     '--disable-extensions',
                     '--disable-background-networking',
@@ -53,15 +93,17 @@ class WhatsAppManager extends EventEmitter {
                     '--disable-backgrounding-occluded-windows',
                     '--disable-renderer-backgrounding',
                     '--disable-background-timer-throttling',
-                    '--js-flags=--max-old-space-size=256',
+                    '--disable-ipc-flooding-protection',
+                    '--disable-features=site-per-process',
+                    '--js-flags=--max-old-space-size=128',
                 ],
             },
             qrMaxRetries: 5,
         });
 
-        // QR Code event
         client.on('qr', async (qr) => {
-            console.log(`[WhatsApp] QR received for session ${sessionId}`);
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`[WhatsApp] QR generated for ${sessionId} in ${elapsed}s`);
             try {
                 const qrDataUrl = await qrcode.toDataURL(qr);
                 this.emit('qr', { userId, sessionId, qr: qrDataUrl });
@@ -70,9 +112,9 @@ class WhatsAppManager extends EventEmitter {
             }
         });
 
-        // Ready event
         client.on('ready', () => {
-            console.log(`[WhatsApp] Session ${sessionId} is ready!`);
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`[WhatsApp] Session ${sessionId} ready in ${elapsed}s`);
             const info = client.info;
             this.emit('ready', {
                 userId,
@@ -81,28 +123,25 @@ class WhatsAppManager extends EventEmitter {
             });
         });
 
-        // Authentication success
         client.on('authenticated', () => {
             console.log(`[WhatsApp] Session ${sessionId} authenticated`);
             this.emit('authenticated', { userId, sessionId });
         });
 
-        // Authentication failure
         client.on('auth_failure', (msg) => {
             console.error(`[WhatsApp] Auth failure for session ${sessionId}:`, msg);
+            this.sessions.delete(sessionId);
+            this.removeSessionFiles(sessionId);
             this.emit('auth_failure', { userId, sessionId, error: msg });
         });
 
-        // Disconnected
         client.on('disconnected', (reason) => {
             console.log(`[WhatsApp] Session ${sessionId} disconnected:`, reason);
             this.sessions.delete(sessionId);
             this.emit('disconnected', { userId, sessionId, reason });
         });
 
-        // Incoming message
         client.on('message', async (message) => {
-            // Filter out status broadcasts, group messages, and system messages
             if (
                 message.from === 'status@broadcast' ||
                 message.from.endsWith('@g.us') ||
@@ -110,18 +149,14 @@ class WhatsAppManager extends EventEmitter {
                 message.type === 'revoked' ||
                 !message.body
             ) {
-                return; // Ignore non-chat messages
+                return;
             }
 
-            console.log(`[WhatsApp] Message received in session ${sessionId} from ${message.from}`);
-
-            // Extract real contact information (to avoid using LIDs and get pushname)
             let realPhone = message.from;
             let contactName = null;
             try {
                 const contact = await message.getContact();
                 if (contact) {
-                    // contact.number is the real phone without suffix
                     if (contact.number) realPhone = `${contact.number}@c.us`;
                     contactName = contact.name || contact.pushname || null;
                 }
@@ -132,8 +167,8 @@ class WhatsAppManager extends EventEmitter {
             this.emit('message', {
                 userId,
                 sessionId,
-                from: realPhone, // Use the real resolved phone
-                originalFrom: message.from, // Keep the original just in case
+                from: realPhone,
+                originalFrom: message.from,
                 contactName,
                 to: message.to,
                 body: message.body,
@@ -144,7 +179,6 @@ class WhatsAppManager extends EventEmitter {
             });
         });
 
-        // Message acknowledgement (sent/delivered/read)
         client.on('message_ack', (message, ack) => {
             this.emit('message_ack', {
                 userId,
@@ -154,15 +188,14 @@ class WhatsAppManager extends EventEmitter {
             });
         });
 
-        // Store client
         this.sessions.set(sessionId, { client, userId });
 
-        // Initialize
         try {
             await client.initialize();
         } catch (err) {
-            console.error(`[WhatsApp] Error initializing session ${sessionId}:`, err);
+            console.error(`[WhatsApp] Error initializing session ${sessionId}:`, err.message);
             this.sessions.delete(sessionId);
+            this.removeSessionFiles(sessionId);
             this.emit('error', { userId, sessionId, error: err.message });
         }
     }
@@ -250,10 +283,12 @@ class WhatsAppManager extends EventEmitter {
             try {
                 await session.client.destroy();
             } catch (err) {
-                console.error(`[WhatsApp] Error destroying session ${sessionId}:`, err);
+                console.error(`[WhatsApp] Error destroying session ${sessionId}:`, err.message);
             }
             this.sessions.delete(sessionId);
         }
+        // Always clean up session files from disk
+        this.removeSessionFiles(sessionId);
     }
 
     /**

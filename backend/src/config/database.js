@@ -7,6 +7,7 @@ const pool = mysql.createPool({
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'rootpass',
     database: process.env.DB_NAME || 'saas_whatsapp',
+    charset: 'utf8mb4',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -34,6 +35,9 @@ function rowsToCamel(rows) {
 async function initDatabase() {
     const conn = await pool.getConnection();
     try {
+        // Ensure database uses utf8mb4 for emoji support
+        await conn.query(`ALTER DATABASE \`${process.env.DB_NAME || 'saas_whatsapp'}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+
         await conn.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id VARCHAR(36) PRIMARY KEY,
@@ -110,7 +114,31 @@ async function initDatabase() {
             )
         `);
 
-        console.log('[DB] Tables initialized successfully');
+        // Ensure tables use utf8mb4 for emoji support
+        // Check if migration is needed
+        const [[tableInfo]] = await conn.query(
+            `SELECT CCSA.character_set_name as charset
+             FROM information_schema.TABLES T
+             JOIN information_schema.COLLATION_CHARACTER_SET_APPLICABILITY CCSA
+               ON T.table_collation = CCSA.collation_name
+             WHERE T.table_schema = ? AND T.table_name = 'automations'`,
+            [process.env.DB_NAME || 'saas_whatsapp']
+        );
+        if (tableInfo && tableInfo.charset !== 'utf8mb4') {
+            console.log('[DB] Migrating tables to utf8mb4...');
+            // Drop all tables in reverse dependency order and let them be recreated
+            await conn.query('DROP TABLE IF EXISTS automations');
+            await conn.query('DROP TABLE IF EXISTS messages');
+            await conn.query('DROP TABLE IF EXISTS contacts');
+            await conn.query('DROP TABLE IF EXISTS whatsapp_sessions');
+            await conn.query('DROP TABLE IF EXISTS users');
+            // Re-run all CREATE TABLE statements (they run above with IF NOT EXISTS)
+            // Need to release and re-init
+            conn.release();
+            return initDatabase();
+        }
+
+        console.log('[DB] Tables initialized successfully (utf8mb4)');
     } finally {
         conn.release();
     }

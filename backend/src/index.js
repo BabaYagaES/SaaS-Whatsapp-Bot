@@ -146,7 +146,7 @@ async function aggregateStats() {
 }
 
 async function processScheduledCampaigns() {
-    console.log('[Worker] Checking scheduled campaigns...');
+    // Placeholder for future campaign scheduling
 }
 
 // ==========================================
@@ -154,6 +154,11 @@ async function processScheduledCampaigns() {
 // ==========================================
 async function reconnectSessions() {
     try {
+        // Get all session IDs from DB to clean orphaned folders
+        const [allSessions] = await pool.execute('SELECT id FROM whatsapp_sessions');
+        const activeIds = allSessions.map(s => s.id);
+        await whatsappManager.cleanOrphanedSessions(activeIds);
+
         const [sessions] = await pool.execute(
             'SELECT id, user_id, session_name FROM whatsapp_sessions WHERE status = ?',
             ['CONNECTED']
