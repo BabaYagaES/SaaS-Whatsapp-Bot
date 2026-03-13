@@ -56,7 +56,9 @@ const authLimiter = rateLimit({
 // ==========================================
 // Middleware
 // ==========================================
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors({
     origin: ['http://localhost:3000'],
     credentials: true,
@@ -65,6 +67,9 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(generalLimiter);
+
+// Serve static uploads
+app.use('/uploads', express.static(path.resolve(__dirname, '../../public/uploads')));
 
 // Make io accessible to routes
 app.set('io', io);

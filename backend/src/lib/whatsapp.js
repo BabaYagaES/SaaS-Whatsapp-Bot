@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const EventEmitter = require('events');
 const path = require('path');
@@ -205,9 +205,11 @@ class WhatsAppManager extends EventEmitter {
      * @param {string} sessionId 
      * @param {string} to - Phone number with country code (e.g., '521234567890@c.us' or '521234567890@lid')
      * @param {string} message 
+     * @param {string} mediaMimeType
+     * @param {string} mediaName
      * @returns {Promise<object>}
      */
-    async sendMessage(sessionId, to, message) {
+    async sendMessage(sessionId, to, message, mediaBase64, mediaMimeType, mediaName) {
         const session = this.sessions.get(sessionId);
         if (!session) {
             throw new Error(`Session ${sessionId} not found or not connected`);
@@ -225,13 +227,21 @@ class WhatsAppManager extends EventEmitter {
 
         console.log(`[WhatsApp] Sending message to: ${chatId} via session ${sessionId}`);
 
+        let content = message || '';
+        let options = {};
+        if (mediaBase64 && mediaMimeType) {
+            content = new MessageMedia(mediaMimeType, mediaBase64, mediaName || 'file');
+            if (message) options.caption = message;
+        }
+
         try {
-            const sentMessage = await session.client.sendMessage(chatId, message);
+            const sentMessage = await session.client.sendMessage(chatId, content, options);
             console.log(`[WhatsApp] Message sent successfully to ${chatId}`);
             return {
                 id: sentMessage.id._serialized,
                 to: chatId,
                 body: message,
+                mediaUrl: null, // we will return the assigned URL from the routes controller
                 timestamp: sentMessage.timestamp,
             };
         } catch (err) {
@@ -240,12 +250,13 @@ class WhatsAppManager extends EventEmitter {
                 const lidChatId = chatId.replace('@c.us', '@lid');
                 console.log(`[WhatsApp] Retrying with LID format: ${lidChatId}`);
                 try {
-                    const sentMessage = await session.client.sendMessage(lidChatId, message);
+                    const sentMessage = await session.client.sendMessage(lidChatId, content, options);
                     console.log(`[WhatsApp] Message sent successfully to ${lidChatId}`);
                     return {
                         id: sentMessage.id._serialized,
                         to: lidChatId,
                         body: message,
+                        mediaUrl: null,
                         timestamp: sentMessage.timestamp,
                     };
                 } catch (retryErr) {

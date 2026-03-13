@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const { pool, generateId, toCamelCase, rowsToCamel } = require('../../config/database');
 const { authenticate } = require('../../middlewares/auth.middleware');
 const { checkSessionLimit, checkMessageLimit } = require('../../middlewares/plan.middleware');
@@ -119,9 +121,9 @@ router.delete('/sessions/:id', async (req, res) => {
 // POST /api/whatsapp/sessions/:id/send
 router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
     try {
-        const { to, message } = req.body;
-        if (!to || !message) {
-            return res.status(400).json({ error: { message: 'Se requiere destinatario y mensaje' } });
+        const { to, message, mediaBase64, mediaMimeType, mediaName } = req.body;
+        if (!to || (!message && !mediaBase64)) {
+            return res.status(400).json({ error: { message: 'Se requiere destinatario y mensaje o archivo' } });
         }
 
         const [sessions] = await pool.execute(
@@ -148,7 +150,25 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
             });
         }
 
-        const result = await whatsappManager.sendMessage(session.id, to, message);
+        const result = await whatsappManager.sendMessage(session.id, to, message, mediaBase64, mediaMimeType, mediaName);
+
+        // Handle Media Save for frontend display
+        let mediaUrl = null;
+        if (mediaBase64) {
+            try {
+                const uploadsDir = path.resolve(__dirname, '../../../../public/uploads');
+                if (!fs.existsSync(uploadsDir)) {
+                    fs.mkdirSync(uploadsDir, { recursive: true });
+                }
+                const ext = mediaName ? path.extname(mediaName) : (mediaMimeType.includes('image') ? '.jpg' : '.bin');
+                const fileName = `${Date.now()}-${generateId()}${ext}`;
+                const filePath = path.join(uploadsDir, fileName);
+                fs.writeFileSync(filePath, Buffer.from(mediaBase64, 'base64'));
+                mediaUrl = `http://localhost:3001/uploads/${fileName}`; // Adjust based on your API setup
+            } catch (err) {
+                console.error('[WhatsApp] Error saving media locally:', err);
+            }
+        }
 
         // Find or create contact
         const phone = to.replace(/@c\.us$/, '').replace(/@lid$/, '').replace(/@g\.us$/, '');
@@ -171,8 +191,8 @@ router.post('/sessions/:id/send', checkMessageLimit, async (req, res) => {
         // Save message
         const msgId = generateId();
         await pool.execute(
-            'INSERT INTO messages (id, session_id, contact_id, direction, body, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [msgId, session.id, contactId, 'OUTBOUND', message, 'SENT']
+            'INSERT INTO messages (id, session_id, contact_id, direction, body, media_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [msgId, session.id, contactId, 'OUTBOUND', message || '', mediaUrl, 'SENT']
         );
 
         const [[savedMessage]] = await pool.execute('SELECT * FROM messages WHERE id = ?', [msgId]);

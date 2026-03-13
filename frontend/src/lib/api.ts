@@ -104,10 +104,16 @@ class ApiClient {
         });
     }
 
-    async sendMessage(sessionId: string, to: string, message: string) {
+    async sendMessage(sessionId: string, to: string, message: string, file?: { name: string, type: string, base64: string } | null) {
+        const body: any = { to, message };
+        if (file) {
+            body.mediaBase64 = file.base64;
+            body.mediaMimeType = file.type;
+            body.mediaName = file.name;
+        }
         return this.request<{ data: any }>(`/api/whatsapp/sessions/${sessionId}/send`, {
             method: 'POST',
-            body: JSON.stringify({ to, message }),
+            body: JSON.stringify(body),
         });
     }
 

@@ -19,6 +19,7 @@ import {
     X,
     ChevronLeft,
     Zap,
+    Bell
 } from "lucide-react";
 
 const navItems = [
@@ -28,6 +29,7 @@ const navItems = [
     { href: "/dashboard/contacts", icon: Users, label: "Contactos" },
     { href: "/dashboard/automations", icon: Bot, label: "Automatizaciones" },
     { href: "/dashboard/reports", icon: BarChart3, label: "Reportes" },
+    { href: "/dashboard/notifications", icon: Bell, label: "Notificaciones" },
     { href: "/dashboard/settings", icon: Settings, label: "Configuración" },
 ];
 

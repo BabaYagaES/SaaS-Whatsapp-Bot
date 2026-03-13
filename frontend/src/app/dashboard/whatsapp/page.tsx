@@ -14,6 +14,7 @@ import {
     RefreshCw,
     Phone,
     MessageSquare,
+    X,
 } from "lucide-react";
 
 interface Session {
@@ -33,6 +34,7 @@ export default function WhatsAppPage() {
     const [showCreate, setShowCreate] = useState(false);
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{id: string, message: string} | null>(null);
 
     const loadSessions = async () => {
         try {
@@ -99,8 +101,14 @@ export default function WhatsAppPage() {
         }
     };
 
-    const handleDeleteSession = async (id: string) => {
-        if (!confirm("¿Estás seguro de eliminar esta sesión?")) return;
+    const promptDelete = (id: string) => {
+        setConfirmModal({ id, message: "¿Estás seguro de que deseas eliminar esta sesión? Esta acción no se puede deshacer." });
+    };
+
+    const confirmDelete = async () => {
+        if (!confirmModal) return;
+        const id = confirmModal.id;
+        setConfirmModal(null);
         try {
             await api.deleteSession(id);
             setSessions((prev) => prev.filter((s) => s.id !== id));
@@ -118,6 +126,54 @@ export default function WhatsAppPage() {
         QR_READY: { label: "Escanea el QR", color: "var(--color-warning-500)", icon: QrCode },
         CONNECTING: { label: "Conectando...", color: "var(--color-primary-500)", icon: RefreshCw },
         DISCONNECTED: { label: "Desconectado", color: "var(--color-dark-500)", icon: WifiOff },
+    };
+
+    const renderConfirmModal = () => {
+        if (!confirmModal) return null;
+
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                <div className="w-full max-w-sm bg-dark-900 border border-dark-700/50 rounded-2xl shadow-2xl overflow-hidden relative">
+                    <button 
+                        onClick={() => setConfirmModal(null)}
+                        className="absolute right-4 top-4 p-1.5 rounded-lg text-dark-400 hover:text-white hover:bg-dark-800 transition-colors z-10"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    
+                    <div className="p-6">
+                        <div className="flex justify-center mb-4">
+                            <div className="p-4 rounded-full bg-danger-500/20 text-danger-500">
+                                <Trash2 className="w-10 h-10" />
+                            </div>
+                        </div>
+                        
+                        <h3 className="text-xl font-bold text-center text-white mb-2">
+                            ¿Eliminar sesión?
+                        </h3>
+                        
+                        <p className="text-dark-300 text-center text-sm mb-6">
+                            {confirmModal.message}
+                        </p>
+
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setConfirmModal(null)}
+                                className="flex-1 px-4 py-2.5 rounded-xl font-medium text-white bg-dark-800 hover:bg-dark-700 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 px-4 py-2.5 rounded-xl font-medium text-white bg-danger-500 hover:bg-danger-600 transition-colors shadow-lg shadow-danger-500/20"
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     return (
@@ -273,7 +329,7 @@ export default function WhatsAppPage() {
                                     </div>
 
                                     <button
-                                        onClick={() => handleDeleteSession(session.id)}
+                                        onClick={() => promptDelete(session.id)}
                                         className="p-2 rounded-lg text-dark-600 hover:text-danger-500 hover:bg-danger-500/10 transition-all opacity-0 group-hover:opacity-100"
                                     >
                                         <Trash2 className="w-5 h-5" />
@@ -284,6 +340,7 @@ export default function WhatsAppPage() {
                     })}
                 </div>
             )}
+            {renderConfirmModal()}
         </div>
     );
 }

@@ -114,6 +114,12 @@ async function initDatabase() {
             )
         `);
 
+        try {
+            await conn.query(`ALTER TABLE messages ADD COLUMN media_url TEXT AFTER body`);
+        } catch (e) {
+            // Field might already exist. Ignore duplicate column error.
+        }
+
         // Ensure tables use utf8mb4 for emoji support
         // Check if migration is needed
         const [[tableInfo]] = await conn.query(
