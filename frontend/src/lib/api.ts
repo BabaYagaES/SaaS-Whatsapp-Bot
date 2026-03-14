@@ -40,6 +40,10 @@ class ApiClient {
         return res.json();
     }
 
+    async getLeads() {
+        return this.request<{ leads: any[] }>('/api/leads');
+    }
+
     // Auth
     async register(email: string, password: string, name?: string) {
         return this.request<{ user: any; token: string }>('/api/auth/register', {
@@ -75,10 +79,31 @@ class ApiClient {
         return this.request<{ stats: any }>('/api/users/stats');
     }
 
-    async updateProfile(data: { name?: string; avatar?: string }) {
+    async updateProfile(data: { 
+        name?: string; 
+        avatar?: string;
+        businessType?: string;
+        businessName?: string;
+        businessDescription?: string;
+    }) {
         return this.request<{ user: any }>('/api/users/profile', {
             method: 'PUT',
             body: JSON.stringify(data),
+        });
+    }
+
+    // AI
+    async generateTemplates(data: { businessType: string; businessName: string; businessDescription: string; save?: boolean }) {
+        return this.request<{ templates: { name: string; content: string }[] }>('/api/ai/generate-templates', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async aiChat(message: string) {
+        return this.request<{ response: string }>('/api/ai/chat', {
+            method: 'POST',
+            body: JSON.stringify({ message }),
         });
     }
 

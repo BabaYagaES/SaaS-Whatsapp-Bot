@@ -15,6 +15,7 @@ interface Automation {
     matchType: string;
     enabled: boolean;
     priority: number;
+    isAi: boolean;
 }
 
 const matchLabels: Record<string, string> = {
@@ -31,6 +32,7 @@ export default function AutomationsPage() {
     const [form, setForm] = useState({
         name: "", trigger: "", response: "",
         matchType: "CONTAINS", priority: 0,
+        isAi: false,
     });
 
     const [errorModal, setErrorModal] = useState<{message: string, isUpgrade: boolean} | null>(null);
@@ -55,7 +57,7 @@ export default function AutomationsPage() {
     useEffect(() => { load(); }, []);
 
     const reset = () => {
-        setForm({ name: "", trigger: "", response: "", matchType: "CONTAINS", priority: 0 });
+        setForm({ name: "", trigger: "", response: "", matchType: "CONTAINS", priority: 0, isAi: false });
         setEditId(null); setShowForm(false);
     };
 
@@ -93,7 +95,7 @@ export default function AutomationsPage() {
     };
 
     const edit = (a: Automation) => {
-        setForm({ name: a.name, trigger: a.trigger, response: a.response, matchType: a.matchType, priority: a.priority });
+        setForm({ name: a.name, trigger: a.trigger, response: a.response, matchType: a.matchType, priority: a.priority, isAi: a.isAi });
         setEditId(a.id); setShowForm(true);
     };
 
@@ -272,15 +274,29 @@ export default function AutomationsPage() {
                             <div>
                                 <label className="block text-sm font-medium text-dark-300 mb-1.5">Trigger</label>
                                 <input value={form.trigger} onChange={e => setForm({ ...form, trigger: e.target.value })}
-                                    placeholder="Ej: precio"
+                                    placeholder="Ej: precio, cuanto cuesta, valor"
                                     className="w-full px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white placeholder-dark-500 focus:outline-none focus:border-primary-500 transition-all" />
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-dark-300 mb-1.5">Respuesta</label>
+                            <label className="block text-sm font-medium text-dark-300 mb-1.5">Respuesta {form.isAi && "(Base / Contexto)"}</label>
                             <textarea value={form.response} onChange={e => setForm({ ...form, response: e.target.value })}
-                                placeholder="Ej: ¡Hola! Aquí tienes nuestro catálogo..." rows={3}
+                                placeholder={form.isAi ? "Ej: Saluda cordialmente y ofrece el menú..." : "Ej: ¡Hola! Aquí tienes nuestro catálogo..."} rows={3}
                                 className="w-full px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white placeholder-dark-500 focus:outline-none focus:border-primary-500 transition-all resize-none" />
+                        </div>
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-primary-500/5 border border-primary-500/20">
+                            <div>
+                                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                    <Zap className="w-4 h-4 text-primary-400" /> Modo IA Inteligente
+                                </h4>
+                                <p className="text-xs text-dark-400 mt-0.5">La respuesta será generada dinámicamente usando tu perfil de negocio.</p>
+                            </div>
+                            <button 
+                                onClick={() => setForm({ ...form, isAi: !form.isAi })}
+                                className="transition-all"
+                            >
+                                {form.isAi ? <ToggleRight className="w-9 h-9 text-primary-500 shrink-0" /> : <ToggleLeft className="w-9 h-9 text-dark-600 shrink-0" />}
+                            </button>
                         </div>
                         <div className="p-4 rounded-xl bg-dark-900/60 border border-dark-700/30">
                             <p className="text-xs text-dark-500 mb-2 flex items-center gap-1"><Zap className="w-3.5 h-3.5" /> Vista previa</p>
@@ -337,7 +353,14 @@ export default function AutomationsPage() {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3 mb-1">
                                         <h3 className="font-semibold text-white">{a.name}</h3>
-                                        <span className="px-2 py-0.5 rounded-md bg-dark-700/60 text-xs text-dark-400">{matchLabels[a.matchType]}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2 py-0.5 rounded-md bg-dark-700/60 text-xs text-dark-400">{matchLabels[a.matchType]}</span>
+                                            {a.isAi && (
+                                                <span className="px-2 py-0.5 rounded-md bg-primary-500/20 text-[10px] font-bold text-primary-400 flex items-center gap-1 border border-primary-500/20 uppercase tracking-wider">
+                                                    <Zap className="w-2.5 h-2.5" /> IA
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 mt-2 text-sm">
                                         <span className="px-2.5 py-1 rounded-lg bg-dark-800 text-dark-300 font-mono text-xs">&quot;{a.trigger}&quot;</span>

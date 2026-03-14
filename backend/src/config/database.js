@@ -46,6 +46,9 @@ async function initDatabase() {
                 name VARCHAR(255),
                 plan VARCHAR(50) DEFAULT 'FREE',
                 avatar TEXT,
+                business_type VARCHAR(100),
+                business_name VARCHAR(255),
+                business_description TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
@@ -73,10 +76,30 @@ async function initDatabase() {
                 name VARCHAR(255),
                 tags TEXT,
                 notes TEXT,
+                ai_active BOOLEAN DEFAULT FALSE,
+                last_ai_at DATETIME,
+                is_lead BOOLEAN DEFAULT FALSE,
+                lead_source VARCHAR(255),
+                lead_status VARCHAR(50) DEFAULT 'NEW',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE KEY unique_user_phone (user_id, phone)
+            )
+        `);
+
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS leads (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                contact_id VARCHAR(36),
+                source VARCHAR(255),
+                status VARCHAR(50) DEFAULT 'NEW',
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL
             )
         `);
 
@@ -108,6 +131,7 @@ async function initDatabase() {
                 match_type VARCHAR(50) DEFAULT 'CONTAINS',
                 enabled BOOLEAN DEFAULT TRUE,
                 priority INT DEFAULT 0,
+                is_ai BOOLEAN DEFAULT FALSE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -115,9 +139,29 @@ async function initDatabase() {
         `);
 
         try {
+            await conn.query(`ALTER TABLE automations ADD COLUMN is_ai BOOLEAN DEFAULT FALSE AFTER priority`);
+        } catch (e) {
+            // Already exists.
+        }
+
+        try {
             await conn.query(`ALTER TABLE messages ADD COLUMN media_url TEXT AFTER body`);
         } catch (e) {
-            // Field might already exist. Ignore duplicate column error.
+            // Field might already exist.
+        }
+
+        try {
+            await conn.query(`ALTER TABLE contacts ADD COLUMN ai_active BOOLEAN DEFAULT FALSE AFTER notes`);
+            await conn.query(`ALTER TABLE contacts ADD COLUMN last_ai_at DATETIME AFTER ai_active`);
+        } catch (e) {}
+
+        try {
+            await conn.query(`ALTER TABLE users ADD COLUMN business_type VARCHAR(100) AFTER avatar`);
+            await conn.query(`ALTER TABLE users ADD COLUMN business_name VARCHAR(255) AFTER business_type`);
+            await conn.query(`ALTER TABLE users ADD COLUMN business_description TEXT AFTER business_name`);
+            console.log('[DB] Business columns added successfully');
+        } catch (e) {
+            // Fields might already exist.
         }
 
         // Ensure tables use utf8mb4 for emoji support

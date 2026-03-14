@@ -14,6 +14,7 @@ import {
     Activity,
 } from "lucide-react";
 import Link from "next/link";
+import BusinessOnboarding from "./components/BusinessOnboarding";
 
 interface Stats {
     totalSessions: number;
@@ -27,14 +28,20 @@ export default function DashboardPage() {
     const { user } = useAuthStore();
     const [stats, setStats] = useState<Stats | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     useEffect(() => {
+        // Check if user needs onboarding
+        if (user && !user.businessType) {
+            setShowOnboarding(true);
+        }
+
         api
             .getStats()
             .then((res) => setStats(res.stats))
             .catch(console.error)
             .finally(() => setLoading(false));
-    }, []);
+    }, [user]);
 
     const statCards = [
         {
@@ -211,6 +218,8 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            {showOnboarding && <BusinessOnboarding onComplete={() => setShowOnboarding(false)} />}
         </div>
     );
 }

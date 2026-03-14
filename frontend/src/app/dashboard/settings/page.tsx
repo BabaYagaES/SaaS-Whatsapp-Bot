@@ -5,14 +5,19 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import {
     Settings, User, Save, Loader2, Shield, CreditCard,
-    Lock, Eye, EyeOff, CheckCircle, AlertTriangle,
+    Lock, Eye, EyeOff, CheckCircle, AlertTriangle, Zap, Sparkles
 } from "lucide-react";
 
 export default function SettingsPage() {
     const { user, setUser } = useAuthStore();
     const [name, setName] = useState(user?.name || "");
+    const [businessName, setBusinessName] = useState(user?.businessName || "");
+    const [businessType, setBusinessType] = useState(user?.businessType || "");
+    const [businessDescription, setBusinessDescription] = useState(user?.businessDescription || "");
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
+    const [aiSuccess, setAiSuccess] = useState(false);
 
     // Password state
     const [currentPassword, setCurrentPassword] = useState("");
@@ -28,7 +33,12 @@ export default function SettingsPage() {
         setSaving(true);
         setSuccess(false);
         try {
-            const res = await api.updateProfile({ name });
+            const res = await api.updateProfile({ 
+                name, 
+                businessName, 
+                businessType, 
+                businessDescription 
+            });
             setUser(res.user);
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
@@ -36,6 +46,30 @@ export default function SettingsPage() {
             alert(err.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleGenerateAi = async () => {
+        if (!businessName || !businessType) {
+            alert("Por favor completa el nombre y tipo de negocio antes de generar.");
+            return;
+        }
+        setAiGenerating(true);
+        setAiSuccess(false);
+        try {
+            await api.generateTemplates({
+                businessName,
+                businessType,
+                businessDescription,
+                save: true
+            });
+            setAiSuccess(true);
+            setTimeout(() => setAiSuccess(false), 3000);
+            alert("¡IA activada! Hemos generado y guardado 3 nuevas automatizaciones inteligentes basadas en tu perfil.");
+        } catch (err: any) {
+            alert("Error con la IA: " + err.message);
+        } finally {
+            setAiGenerating(false);
         }
     };
 
@@ -125,18 +159,63 @@ export default function SettingsPage() {
                         />
                     </div>
                 </div>
-                <div className="flex items-center gap-3 mt-4">
+
+                <div className="grid sm:grid-cols-2 gap-4 mt-4">
+                    <div>
+                        <label className="block text-sm font-medium text-dark-300 mb-1.5">Nombre del Negocio</label>
+                        <input
+                            value={businessName}
+                            onChange={(e) => setBusinessName(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white focus:outline-none focus:border-primary-500 transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-dark-300 mb-1.5">Tipo de Negocio</label>
+                        <input
+                            value={businessType}
+                            onChange={(e) => setBusinessType(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white focus:outline-none focus:border-primary-500 transition-all"
+                        />
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    <label className="block text-sm font-medium text-dark-300 mb-1.5">Descripción del Negocio</label>
+                    <textarea
+                        value={businessDescription}
+                        onChange={(e) => setBusinessDescription(e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white focus:outline-none focus:border-primary-500 transition-all resize-none"
+                    />
+                </div>
+                <div className="flex flex-wrap items-center gap-3 mt-6">
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-white gradient-primary hover:opacity-90 transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-white gradient-primary hover:opacity-90 transition-all disabled:opacity-50"
                     >
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        Guardar
+                        Guardar Perfil
                     </button>
+
+                    <button
+                        onClick={handleGenerateAi}
+                        disabled={aiGenerating || saving}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-white bg-warning-600/20 border border-warning-500/30 hover:bg-warning-500/30 transition-all disabled:opacity-50"
+                    >
+                        {aiGenerating ? <Loader2 className="w-4 h-4 animate-spin text-warning-500" /> : <Zap className="w-4 h-4 text-warning-500" />}
+                        <span className="text-warning-500">Auto-Generar Automatizaciones</span>
+                    </button>
+
                     {success && (
                         <span className="text-sm text-[var(--color-whatsapp)] animate-fadeIn flex items-center gap-1">
                             <CheckCircle className="w-4 h-4" /> Guardado
+                        </span>
+                    )}
+
+                    {aiSuccess && (
+                        <span className="text-sm text-warning-400 animate-fadeIn flex items-center gap-1 font-medium">
+                            <Sparkles className="w-4 h-4" /> IA Actualizada
                         </span>
                     )}
                 </div>

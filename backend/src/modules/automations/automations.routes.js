@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
 // POST /api/automations
 router.post('/', checkAutomationLimit, async (req, res) => {
     try {
-        const { name, trigger, response, matchType, enabled, priority } = req.body;
+        const { name, trigger, response, matchType, enabled, priority, isAi } = req.body;
 
         if (!name || !trigger || !response) {
             return res.status(400).json({ error: { message: 'name, trigger, and response are required' } });
@@ -32,8 +32,8 @@ router.post('/', checkAutomationLimit, async (req, res) => {
 
         const id = generateId();
         await pool.execute(
-            'INSERT INTO automations (id, user_id, name, `trigger`, response, match_type, enabled, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, req.user.id, name, trigger, response, matchType || 'CONTAINS', enabled !== false, priority || 0]
+            'INSERT INTO automations (id, user_id, name, `trigger`, response, match_type, enabled, priority, is_ai) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.id, name, trigger, response, matchType || 'CONTAINS', enabled !== false, priority || 0, isAi === true]
         );
 
         const [[row]] = await pool.execute('SELECT * FROM automations WHERE id = ?', [id]);
@@ -47,7 +47,7 @@ router.post('/', checkAutomationLimit, async (req, res) => {
 // PUT /api/automations/:id
 router.put('/:id', async (req, res) => {
     try {
-        const { name, trigger, response, matchType, enabled, priority } = req.body;
+        const { name, trigger, response, matchType, enabled, priority, isAi } = req.body;
 
         const [existing] = await pool.execute(
             'SELECT id FROM automations WHERE id = ? AND user_id = ?',
@@ -65,6 +65,7 @@ router.put('/:id', async (req, res) => {
         if (matchType) { fields.push('match_type = ?'); values.push(matchType); }
         if (enabled !== undefined) { fields.push('enabled = ?'); values.push(enabled); }
         if (priority !== undefined) { fields.push('priority = ?'); values.push(priority); }
+        if (isAi !== undefined) { fields.push('is_ai = ?'); values.push(isAi); }
 
         if (fields.length > 0) {
             values.push(req.params.id);

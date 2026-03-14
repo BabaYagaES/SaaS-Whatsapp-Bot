@@ -1,5 +1,6 @@
 const { whatsappManager } = require('../../lib/whatsapp');
 const { pool, generateId, toCamelCase } = require('../../config/database');
+const { generateResponse } = require('../../lib/ai');
 
 function setupWhatsAppEvents(io) {
     // QR Code generated
@@ -103,56 +104,125 @@ async function processAutomations(userId, sessionId, from, body) {
     if (!body) return;
 
     try {
-        const [automations] = await pool.execute(
-            'SELECT * FROM automations WHERE user_id = ? AND enabled = TRUE ORDER BY priority DESC',
-            [userId]
+        const phone = from.replace(/@c\.us$/, '').replace(/@lid$/, '').replace(/@g\.us$/, '');
+        
+        // 1. Get contact and check AI status
+        const [contacts] = await pool.execute(
+            'SELECT id, name, ai_active, last_ai_at FROM contacts WHERE user_id = ? AND phone = ?',
+            [userId, phone]
         );
+        const contact = contacts[0];
+        if (!contact) return;
 
-        for (const auto of automations) {
-            let matched = false;
+        let shouldAiRespond = false;
+        
+        // Check if AI is already active and not expired (30 min)
+        const now = new Date();
+        const thirtyMinsAgo = new Date(now.getTime() - 30 * 60 * 1000);
+        
+        if (contact.ai_active && contact.last_ai_at && contact.last_ai_at > thirtyMinsAgo) {
+            shouldAiRespond = true;
+        }
 
-            switch (auto.match_type) {
-                case 'EXACT':
-                    matched = body.toLowerCase() === auto.trigger.toLowerCase();
-                    break;
-                case 'CONTAINS':
-                    matched = body.toLowerCase().includes(auto.trigger.toLowerCase());
-                    break;
-                case 'STARTS_WITH':
-                    matched = body.toLowerCase().startsWith(auto.trigger.toLowerCase());
-                    break;
-                case 'REGEX':
-                    try {
-                        const regex = new RegExp(auto.trigger, 'i');
-                        matched = regex.test(body);
-                    } catch (e) { }
-                    break;
-            }
+        // 2. If not already in AI mode, check triggers
+        if (!shouldAiRespond) {
+            const [automations] = await pool.execute(
+                'SELECT * FROM automations WHERE user_id = ? AND enabled = TRUE ORDER BY priority DESC',
+                [userId]
+            );
 
-            if (matched) {
-                console.log(`[Automation] Triggered: "${auto.name}" for message: "${body}"`);
+            for (const auto of automations) {
+                const triggers = (auto.trigger || '').split(',').map(t => t.trim().toLowerCase());
+                const lowerBody = body.toLowerCase();
+                let matched = false;
 
-                try {
-                    await whatsappManager.sendMessage(sessionId, from, auto.response);
-
-                    const phone = from.replace(/@c\.us$/, '').replace(/@lid$/, '').replace(/@g\.us$/, '');
-                    const [contacts] = await pool.execute(
-                        'SELECT id FROM contacts WHERE user_id = ? AND phone = ?',
-                        [userId, phone]
-                    );
-
-                    const msgId = generateId();
-                    await pool.execute(
-                        'INSERT INTO messages (id, session_id, contact_id, direction, body, status) VALUES (?, ?, ?, ?, ?, ?)',
-                        [msgId, sessionId, contacts[0]?.id || null, 'OUTBOUND', auto.response, 'SENT']
-                    );
-                } catch (err) {
-                    console.error('[Automation] Error sending auto-reply:', err);
+                switch (auto.match_type) {
+                    case 'EXACT': matched = triggers.some(t => lowerBody === t); break;
+                    case 'CONTAINS': matched = triggers.some(t => lowerBody.includes(t)); break;
+                    case 'STARTS_WITH': matched = triggers.some(t => lowerBody.startsWith(t)); break;
+                    case 'REGEX': try { matched = new RegExp(auto.trigger, 'i').test(body); } catch(e){} break;
                 }
 
-                break; // Only first matching automation
+                if (matched) {
+                    if (auto.is_ai) {
+                        shouldAiRespond = true;
+                        // Activate AI session for this contact
+                        await pool.execute(
+                            'UPDATE contacts SET ai_active = TRUE, last_ai_at = NOW() WHERE id = ?',
+                            [contact.id]
+                        );
+                    } else {
+                        // Regular fixed response
+                        await whatsappManager.sendMessage(sessionId, from, auto.response);
+                        await pool.execute(
+                            'INSERT INTO messages (id, session_id, contact_id, direction, body, status) VALUES (?, ?, ?, ?, ?, ?)',
+                            [generateId(), sessionId, contact.id, 'OUTBOUND', auto.response, 'SENT']
+                        );
+                        return; // Done
+                    }
+                    break;
+                }
             }
         }
+
+        // 3. AI Execution
+        if (shouldAiRespond) {
+            // Fetch history (last 10 messages)
+            const [historyRows] = await pool.execute(
+                'SELECT direction, body FROM messages WHERE contact_id = ? ORDER BY timestamp DESC LIMIT 10',
+                [contact.id]
+            );
+            
+            const history = historyRows.reverse().map(m => ({
+                role: m.direction === 'INBOUND' ? 'user' : 'assistant',
+                content: m.body
+            }));
+
+            // Get business info
+            const [users] = await pool.execute(
+                'SELECT business_name, business_type, business_description FROM users WHERE id = ?',
+                [userId]
+            );
+            const biz = users[0] || {};
+
+            let aiResponse = await generateResponse(history, {
+                businessName: biz.business_name,
+                businessType: biz.business_type,
+                businessDescription: biz.business_description
+            });
+
+            // 4. Extract Lead/Order Data if present
+            const orderMatch = aiResponse.match(/\[\[ORDER_DATA:\s*({[\s\S]*?})\]\]/);
+            if (orderMatch) {
+                try {
+                    const orderData = JSON.parse(orderMatch[1]);
+                    // Clean response message to user
+                    aiResponse = aiResponse.replace(orderMatch[0], '').trim();
+                    
+                    // Save to leads table
+                    await pool.execute(
+                        'INSERT INTO leads (id, user_id, contact_id, source, notes) VALUES (?, ?, ?, ?, ?)',
+                        [generateId(), userId, contact.id, 'WhatsApp AI', `Pedido detectado: ${JSON.stringify(orderData)}`]
+                    );
+                    // Mark contact as lead
+                    await pool.execute('UPDATE contacts SET is_lead = TRUE WHERE id = ?', [contact.id]);
+                } catch (e) {
+                    console.error('[AI] Lead extraction failed:', e);
+                }
+            }
+
+            // 5. Send and Save
+            await whatsappManager.sendMessage(sessionId, from, aiResponse);
+            await pool.execute(
+                'UPDATE contacts SET last_ai_at = NOW() WHERE id = ?',
+                [contact.id]
+            );
+            await pool.execute(
+                'INSERT INTO messages (id, session_id, contact_id, direction, body, status) VALUES (?, ?, ?, ?, ?, ?)',
+                [generateId(), sessionId, contact.id, 'OUTBOUND', aiResponse, 'SENT']
+            );
+        }
+
     } catch (err) {
         console.error('[Automation] Error processing:', err);
     }

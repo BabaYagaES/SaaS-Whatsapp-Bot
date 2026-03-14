@@ -6,6 +6,9 @@ interface User {
     name: string;
     plan: string;
     avatar?: string;
+    businessType?: string;
+    businessName?: string;
+    businessDescription?: string;
 }
 
 interface AuthState {

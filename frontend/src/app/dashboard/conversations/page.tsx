@@ -18,7 +18,8 @@ import {
     X,
     AlertTriangle as Warning,
     CheckCheck,
-    Loader2
+    Loader2,
+    Zap
 } from "lucide-react";
 
 interface Conversation {
@@ -110,6 +111,27 @@ export default function ConversationsPage() {
     };
 
     const [sendError, setSendError] = useState<string | null>(null);
+
+    const [generatingAi, setGeneratingAi] = useState(false);
+
+    const handleAiGenerate = async () => {
+        if (!selectedContact) return;
+        
+        // Get the last user message to reply to
+        const lastInbound = [...messages].reverse().find(m => m.direction === 'INBOUND');
+        if (!lastInbound && !newMessage.trim()) return;
+
+        setGeneratingAi(true);
+        try {
+            const prompt = newMessage.trim() || `Responder al mensaje: "${lastInbound?.body}"`;
+            const res = await api.aiChat(prompt);
+            setNewMessage(res.response);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setGeneratingAi(false);
+        }
+    };
 
     const handleSend = async () => {
         if ((!newMessage.trim() && !fileToSend) || !selectedContact || sessions.length === 0) return;
@@ -467,10 +489,18 @@ export default function ConversationsPage() {
                                             }
                                         }}
                                         placeholder="Escribe un mensaje..."
-                                        className="w-full bg-transparent px-4 py-3.5 text-[15px] text-white placeholder-dark-500 focus:outline-none resize-none max-h-32 min-h-[52px]"
+                                        className="w-full bg-transparent px-4 py-3.5 pr-12 text-[15px] text-white placeholder-dark-500 focus:outline-none resize-none max-h-32 min-h-[52px]"
                                         rows={1}
                                         style={{ overflowY: newMessage.split('\n').length > 1 ? 'auto' : 'hidden' }}
                                     />
+                                    <button 
+                                        onClick={handleAiGenerate}
+                                        title="Generar respuesta con IA"
+                                        disabled={generatingAi}
+                                        className="absolute right-2 p-2 rounded-lg text-amber-500/60 hover:text-amber-400 hover:bg-amber-500/10 transition-all disabled:opacity-50"
+                                    >
+                                        {generatingAi ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+                                    </button>
                                 </div>
                                 
                                 <button
