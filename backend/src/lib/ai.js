@@ -3,13 +3,99 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const key = (process.env.GOOGLE_GEMINI_API_KEY || '').trim();
 const groqKey = (process.env.GROQ_API_KEY || '').trim();
 
-const genAI = key 
+const genAI = key
     ? new GoogleGenerativeAI(key)
     : null;
 
-/**
- * Common interface for AI providers
- */
+// ---------------------------------------------------------------------------
+// ConversationMemory — stores per-contact message history in memory
+// Key: `${userId}:${contactPhone}`
+// Automatically evicts conversations inactive for `ttlMs` milliseconds.
+// ---------------------------------------------------------------------------
+class ConversationMemory {
+    constructor({ maxMessages = 20, ttlMs = 2 * 60 * 60 * 1000 } = {}) {
+        this.conversations = new Map();
+        this.maxMessages = maxMessages;
+        this.ttlMs = ttlMs;
+        // Periodic cleanup every 30 minutes; unref() so it doesn't block process exit
+        setInterval(() => this._cleanup(), 30 * 60 * 1000).unref();
+    }
+
+    _key(userId, contactPhone) {
+        return `${userId}:${contactPhone}`;
+    }
+
+    _cleanup() {
+        const now = Date.now();
+        for (const [key, conv] of this.conversations) {
+            if (now - conv.lastActivity > this.ttlMs) {
+                this.conversations.delete(key);
+            }
+        }
+    }
+
+    add(userId, contactPhone, role, content) {
+        const key = this._key(userId, contactPhone);
+        if (!this.conversations.has(key)) {
+            this.conversations.set(key, { messages: [], lastActivity: Date.now() });
+        }
+        const conv = this.conversations.get(key);
+        conv.messages.push({ role, content });
+        // Keep only the most recent maxMessages turns
+        if (conv.messages.length > this.maxMessages) {
+            conv.messages.splice(0, conv.messages.length - this.maxMessages);
+        }
+        conv.lastActivity = Date.now();
+    }
+
+    get(userId, contactPhone) {
+        const conv = this.conversations.get(this._key(userId, contactPhone));
+        return conv ? [...conv.messages] : [];
+    }
+
+    clear(userId, contactPhone) {
+        this.conversations.delete(this._key(userId, contactPhone));
+    }
+}
+
+// Singleton shared across the application
+const conversationMemory = new ConversationMemory();
+
+// ---------------------------------------------------------------------------
+// buildSystemPrompt — creates a strict, business-scoped system prompt
+// ---------------------------------------------------------------------------
+function buildSystemPrompt(context = {}) {
+    const businessName = context.businessName || 'nuestra empresa';
+    const businessType = context.businessType || 'negocio';
+    const businessDescription = context.businessDescription
+        ? `Descripción del negocio: ${context.businessDescription}`
+        : '';
+
+    return `Eres el asistente virtual de ventas de "${businessName}", un negocio de tipo "${businessType}".
+${businessDescription}
+
+=== REGLAS ABSOLUTAS (nunca las ignores) ===
+
+1. ALCANCE: ÚNICAMENTE puedes hablar sobre "${businessName}": productos, servicios, precios, promociones, horarios, formas de pago, pedidos y atención al cliente.
+
+2. TEMAS PROHIBIDOS: NO respondas preguntas de conocimiento general, cultura, historia, geografía, ciencia, entretenimiento, matemáticas, política, chistes u otros temas ajenos al negocio. Si el usuario lo solicita, redirige SIEMPRE la conversación hacia "${businessName}".
+
+3. REDIRECCIÓN: Si el usuario pregunta algo fuera del negocio, responde con algo como:
+   "Solo puedo ayudarte con información y pedidos de ${businessName}. ¿En qué puedo asistirte hoy?"
+
+4. TONO: Sé siempre cordial, profesional y breve (máximo 3-4 líneas, estilo WhatsApp).
+
+5. OBJETIVO: Concretar ventas. Si el usuario muestra intención de compra, solicita los datos necesarios (nombre, producto/servicio, cantidad, dirección si aplica).
+
+6. PEDIDOS: Cuando tengas todos los datos de un pedido, añade al FINAL de tu respuesta (sin mencionarlo en el texto visible):
+   [[ORDER_DATA: {"name": "...", "product": "...", "address": "...", "total": "..."}]]
+
+RECUERDA: Eres EXCLUSIVAMENTE el asistente de "${businessName}". Nada fuera de ese ámbito.`;
+}
+
+// ---------------------------------------------------------------------------
+// callAI — common interface for AI providers (Groq → Gemini fallback)
+// ---------------------------------------------------------------------------
 async function callAI(messages, systemPrompt = "") {
     // Try Groq first if available
     if (groqKey) {
@@ -58,28 +144,14 @@ async function callAI(messages, systemPrompt = "") {
 }
 
 /**
- * Generate a response using AI
- * @param {string|array} messages - Last message or message history
- * @param {object} context - Optional context like business profile
+ * Generate a response using AI.
+ * @param {string|Array} messages - Last message or full message history
+ * @param {object} context - Business profile (businessName, businessType, businessDescription)
  */
 async function generateResponse(messages, context = {}) {
     try {
         const msgArray = Array.isArray(messages) ? messages : [{ role: 'user', content: messages }];
-
-        let systemPrompt = `Eres un asistente virtual experto en WhatsApp Marketing. 
-        Trabajas para "${context.businessName || 'una empresa'}". 
-        Negocio: ${context.businessType || 'General'}.
-        Descripción: ${context.businessDescription || 'Sin descripción'}.
-        
-        INSTRUCCIONES:
-        1. Responde de forma cordial, profesional y breve (WhatsApp style).
-        2. Tu objetivo es ayudar al usuario y concretar pedidos/ventas.
-        3. Si el usuario proporciona datos para un pedido (nombre, producto, cantidad, dirección, etc.), al FINAL de tu respuesta añade SIEMPRE este bloque especial:
-           [[ORDER_DATA: {"name": "...", "product": "...", "address": "...", "total": "..."}]]
-           Sustituye los valores que tengas. Si no tienes algunos, déjalos vacíos.
-        4. No menciones el bloque especial en tu texto, solo añádelo al final.
-        `;
-
+        const systemPrompt = buildSystemPrompt(context);
         return await callAI(msgArray, systemPrompt);
     } catch (err) {
         console.error('[AI] Error generating response:', err);
@@ -123,5 +195,6 @@ async function generateTemplates(businessInfo) {
 
 module.exports = {
     generateResponse,
-    generateTemplates
+    generateTemplates,
+    conversationMemory,
 };

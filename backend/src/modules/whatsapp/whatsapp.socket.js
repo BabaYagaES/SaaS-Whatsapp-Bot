@@ -1,6 +1,6 @@
 const { whatsappManager } = require('../../lib/whatsapp');
 const { pool, generateId, toCamelCase } = require('../../config/database');
-const { generateResponse } = require('../../lib/ai');
+const { generateResponse, conversationMemory } = require('../../lib/ai');
 
 function setupWhatsAppEvents(io) {
     // QR Code generated
@@ -167,23 +167,18 @@ async function processAutomations(userId, sessionId, from, body) {
 
         // 3. AI Execution
         if (shouldAiRespond) {
-            // Fetch history (last 10 messages)
-            const [historyRows] = await pool.execute(
-                'SELECT direction, body FROM messages WHERE contact_id = ? ORDER BY timestamp DESC LIMIT 10',
-                [contact.id]
-            );
-            
-            const history = historyRows.reverse().map(m => ({
-                role: m.direction === 'INBOUND' ? 'user' : 'assistant',
-                content: m.body
-            }));
-
             // Get business info
             const [users] = await pool.execute(
                 'SELECT business_name, business_type, business_description FROM users WHERE id = ?',
                 [userId]
             );
             const biz = users[0] || {};
+
+            // Add the incoming message to this contact's conversation memory
+            conversationMemory.add(userId, phone, 'user', body);
+
+            // Get the full in-memory history for this conversation
+            const history = conversationMemory.get(userId, phone);
 
             let aiResponse = await generateResponse(history, {
                 businessName: biz.business_name,
@@ -210,6 +205,9 @@ async function processAutomations(userId, sessionId, from, body) {
                     console.error('[AI] Lead extraction failed:', e);
                 }
             }
+
+            // Add AI response to conversation memory
+            conversationMemory.add(userId, phone, 'assistant', aiResponse);
 
             // 5. Send and Save
             await whatsappManager.sendMessage(sessionId, from, aiResponse);

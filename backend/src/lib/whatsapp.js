@@ -9,6 +9,17 @@ class WhatsAppManager extends EventEmitter {
         super();
         this.sessions = new Map();
         this.sessionPath = path.resolve(process.cwd(), 'whatsapp-sessions');
+        this.recentMessageIds = new Map();
+
+        // Cleanup dedupe cache periodically
+        setInterval(() => {
+            const now = Date.now();
+            for (const [id, ts] of this.recentMessageIds.entries()) {
+                if (now - ts > 2 * 60 * 1000) {
+                    this.recentMessageIds.delete(id);
+                }
+            }
+        }, 60 * 1000).unref();
     }
 
     getSessionDir() {
@@ -141,13 +152,20 @@ class WhatsAppManager extends EventEmitter {
             this.emit('disconnected', { userId, sessionId, reason });
         });
 
-        client.on('message', async (message) => {
+        const forwardIncomingMessage = async (message) => {
+            const msgId = message?.id?._serialized;
+            if (msgId) {
+                if (this.recentMessageIds.has(msgId)) return;
+                this.recentMessageIds.set(msgId, Date.now());
+            }
+
             if (
+                message.fromMe ||
                 message.from === 'status@broadcast' ||
                 message.from.endsWith('@g.us') ||
                 message.from.endsWith('@broadcast') ||
                 message.type === 'revoked' ||
-                !message.body
+                (!message.body && !message.hasMedia)
             ) {
                 return;
             }
@@ -177,7 +195,11 @@ class WhatsAppManager extends EventEmitter {
                 type: message.type,
                 raw: message,
             });
-        });
+        };
+
+        // In some WhatsApp-web versions message_create is more reliable for inbound sync.
+        client.on('message', forwardIncomingMessage);
+        client.on('message_create', forwardIncomingMessage);
 
         client.on('message_ack', (message, ack) => {
             this.emit('message_ack', {

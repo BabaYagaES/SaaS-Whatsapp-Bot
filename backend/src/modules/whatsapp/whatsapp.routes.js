@@ -44,7 +44,7 @@ router.post('/sessions', checkSessionLimit, async (req, res) => {
 router.get('/sessions', async (req, res) => {
     try {
         const [rows] = await pool.execute(
-            `SELECT s.id, s.session_name, s.status, s.phone, s.created_at,
+            `SELECT s.id, s.session_name, s.status, s.phone, s.qr_code, s.created_at,
                 (SELECT COUNT(*) FROM messages WHERE session_id = s.id) as message_count
             FROM whatsapp_sessions s
             WHERE s.user_id = ?
@@ -57,6 +57,7 @@ router.get('/sessions', async (req, res) => {
             sessionName: r.session_name,
             status: r.status,
             phone: r.phone,
+            qrCode: r.qr_code,
             createdAt: r.created_at,
             _count: { messages: r.message_count },
         }));

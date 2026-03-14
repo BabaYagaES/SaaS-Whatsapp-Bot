@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
-import { getSocket } from "@/lib/socket";
+import { connectSocket, getSocket } from "@/lib/socket";
+import { useAuthStore } from "@/lib/store";
 import {
     MessageSquare,
     Send,
@@ -39,6 +40,8 @@ interface Conversation {
 
 interface Message {
     id: string;
+    sessionId?: string;
+    contactId?: string;
     body: string;
     direction: string;
     timestamp: string;
@@ -46,35 +49,75 @@ interface Message {
     mediaUrl?: string | null;
 }
 
+interface Contact {
+    id: string;
+    phone: string;
+    name: string | null;
+    tags?: string[];
+}
+
+interface SessionInfo {
+    id: string;
+    status: string;
+    sessionName: string;
+    phone?: string | null;
+}
+
+interface IncomingSocketMessage {
+    message: Message & {
+        contact?: {
+            id: string;
+            phone: string;
+            name?: string | null;
+        };
+    };
+}
+
 export default function ConversationsPage() {
+    const { user } = useAuthStore();
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [selectedContact, setSelectedContact] = useState<any>(null);
+    const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
-    const [sessions, setSessions] = useState<any[]>([]);
+    const [sessions, setSessions] = useState<SessionInfo[]>([]);
     const [fileToSend, setFileToSend] = useState<{name: string, type: string, base64: string} | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const selectedContactRef = useRef<Contact | null>(null);
+
+    useEffect(() => {
+        selectedContactRef.current = selectedContact;
+    }, [selectedContact]);
 
     useEffect(() => {
         loadConversations();
         loadSessions();
 
+        if (user?.id) {
+            connectSocket(user.id);
+        }
+
         const socket = getSocket();
-        socket.on("whatsapp:message", ({ message }: any) => {
-            if (selectedContact && message.contact?.id === selectedContact.id) {
+        socket.on("whatsapp:message", ({ message }: IncomingSocketMessage) => {
+            if (selectedContactRef.current && message.contact?.id === selectedContactRef.current.id) {
                 setMessages((prev) => [...prev, message]);
             }
             loadConversations();
         });
 
+        // Fallback for unstable websocket: refresh list periodically.
+        const poll = setInterval(() => {
+            loadConversations();
+        }, 5000);
+
         return () => {
             socket.off("whatsapp:message");
+            clearInterval(poll);
         };
-    }, [selectedContact]);
+    }, [user?.id]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,16 +134,21 @@ export default function ConversationsPage() {
         }
     };
 
-    const loadSessions = async () => {
+    const loadSessions = async (): Promise<SessionInfo[]> => {
         try {
             const res = await api.getSessions();
-            setSessions(res.sessions.filter((s: any) => s.status === "CONNECTED"));
+            const connectedSessions = (res.sessions || []).filter(
+                (s: SessionInfo) => s.status === "CONNECTED"
+            );
+            setSessions(connectedSessions);
+            return connectedSessions;
         } catch (err) {
             console.error(err);
+            return [];
         }
     };
 
-    const openChat = async (contact: any) => {
+    const openChat = async (contact: Contact) => {
         setSelectedContact(contact);
         try {
             const res = await api.getChat(contact.id);
@@ -133,28 +181,54 @@ export default function ConversationsPage() {
         }
     };
 
+    const normalizePhoneForWhatsApp = (phone: string): string => {
+        // Keep only digits to avoid invalid chat IDs like +51...@c.us
+        return phone.replace(/\D/g, '');
+    };
+
     const handleSend = async () => {
-        if ((!newMessage.trim() && !fileToSend) || !selectedContact || sessions.length === 0) return;
+        if ((!newMessage.trim() && !fileToSend) || !selectedContact) return;
         setSending(true);
         setSendError(null);
         try {
-            const res = await api.sendMessage(sessions[0].id, selectedContact.phone, newMessage, fileToSend);
+            const freshSessions = await loadSessions();
+            if (freshSessions.length === 0) {
+                setSendError("No tienes una sesión de WhatsApp conectada. Ve a WhatsApp y reconecta.");
+                return;
+            }
+
+            // Prefer the same session used in the current chat history, fallback to first connected session.
+            const lastSessionId = [...messages].reverse().find((m) => !!m.sessionId)?.sessionId;
+            const targetSession =
+                freshSessions.find((s) => s.id === lastSessionId) || freshSessions[0];
+
+            const toPhone = normalizePhoneForWhatsApp(selectedContact.phone);
+            if (!toPhone) {
+                setSendError("El telefono del contacto no es valido para WhatsApp.");
+                return;
+            }
+
+            const res = await api.sendMessage(targetSession.id, toPhone, newMessage, fileToSend);
             setMessages((prev) => [
                 ...prev,
                 {
-                    id: Date.now().toString(),
+                    id: res.data?.id || Date.now().toString(),
+                    sessionId: targetSession.id,
+                    contactId: selectedContact.id,
                     body: newMessage,
                     direction: "OUTBOUND",
-                    timestamp: new Date().toISOString(),
-                    status: "SENT",
+                    timestamp: res.data?.timestamp || new Date().toISOString(),
+                    status: res.data?.status || "SENT",
                     mediaUrl: res.data?.mediaUrl || null,
                 },
             ]);
+            await loadConversations();
             setNewMessage("");
             setFileToSend(null);
-        } catch (err: any) {
-            console.error('[Send] Error:', err.message);
-            setSendError(err.message || 'Error al enviar el mensaje');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Error al enviar el mensaje';
+            console.error('[Send] Error:', errorMessage);
+            setSendError(errorMessage);
             setTimeout(() => setSendError(null), 8000);
         } finally {
             setSending(false);
