@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WhatsBot SaaS - WhatsApp Automation Platform",
+  title: "Zappy - WhatsApp Automation Platform",
   description: "Powerful WhatsApp automation for businesses. Connect, automate, and scale your messaging.",
   keywords: ["whatsapp", "automation", "chatbot", "saas", "messaging"],
 };

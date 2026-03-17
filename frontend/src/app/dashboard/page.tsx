@@ -111,7 +111,7 @@ export default function DashboardPage() {
                         Hola, {user?.name || "Usuario"} 👋
                     </h1>
                     <p className="text-dark-400">
-                        Bienvenido a tu panel de control de WhatsApp
+                        Bienvenido a tu panel de control de Zappy
                     </p>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 rounded-xl glass-light text-sm animate-fadeIn stagger-1">

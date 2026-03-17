@@ -86,6 +86,25 @@ function setupWhatsAppEvents(io) {
 
             io.to(`user:${userId}`).emit('whatsapp:message', { sessionId, message });
 
+            // Create notification for new message
+            const notifId = generateId();
+            const notifTitle = `Nuevo mensaje de ${contact.name || contact.phone}`;
+            const notifMsg = body ? (body.length > 50 ? body.substring(0, 50) + '...' : body) : 'Archivo recibido';
+            
+            await pool.execute(
+                'INSERT INTO notifications (id, user_id, type, title, message, link) VALUES (?, ?, ?, ?, ?, ?)',
+                [notifId, userId, 'MESSAGE', notifTitle, notifMsg, `/dashboard/conversations?contactId=${contact.id}`]
+            );
+            io.to(`user:${userId}`).emit('notification:new', {
+                id: notifId,
+                type: 'MESSAGE',
+                title: notifTitle,
+                message: notifMsg,
+                link: `/dashboard/conversations?contactId=${contact.id}`,
+                createdAt: new Date(),
+                isRead: false
+            });
+
             // Check automations
             await processAutomations(userId, sessionId, from, body);
         } catch (err) {
@@ -275,6 +294,25 @@ async function processAutomations(userId, sessionId, from, body) {
                             'INSERT INTO leads (id, user_id, contact_id, source, notes, order_data) VALUES (?, ?, ?, ?, ?, ?)',
                             [generateId(), userId, contact.id, 'WhatsApp AI', `Pedido detectado: ${orderData.product || 'Varios'}`, JSON.stringify(orderData)]
                         );
+
+                        // Create notification for new lead
+                        const lNotifId = generateId();
+                        const lNotifTitle = `¡Nuevo pedido de ${contact.name || contact.phone}!`;
+                        const lNotifMsg = `${orderData.product || 'Varios'}${orderData.total ? ' - ' + orderData.total : ''}`;
+                        
+                        await pool.execute(
+                            'INSERT INTO notifications (id, user_id, type, title, message, link) VALUES (?, ?, ?, ?, ?, ?)',
+                            [lNotifId, userId, 'LEAD', lNotifTitle, lNotifMsg, '/dashboard/leads']
+                        );
+                        io.to(`user:${userId}`).emit('notification:new', {
+                            id: lNotifId,
+                            type: 'LEAD',
+                            title: lNotifTitle,
+                            message: lNotifMsg,
+                            link: '/dashboard/leads',
+                            createdAt: new Date(),
+                            isRead: false
+                        });
                     }
 
                     // Update contact info with latest address and last order details

@@ -260,6 +260,23 @@ class ApiClient {
             method: 'DELETE',
         });
     }
+
+    // Notifications
+    async getNotifications() {
+        return this.request<{ notifications: any[] }>('/api/notifications');
+    }
+
+    async markNotificationRead(id: string) {
+        return this.request<{ success: boolean }>(`/api/notifications/${id}/read`, {
+            method: 'PATCH'
+        });
+    }
+
+    async markAllNotificationsRead() {
+        return this.request<{ success: boolean }>('/api/notifications/read-all', {
+            method: 'PATCH'
+        });
+    }
 }
 
 export const api = new ApiClient(API_URL);

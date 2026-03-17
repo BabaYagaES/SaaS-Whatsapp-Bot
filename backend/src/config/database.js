@@ -207,6 +207,20 @@ async function initDatabase() {
             )
         `);
 
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                message TEXT,
+                link VARCHAR(255),
+                is_read BOOLEAN DEFAULT FALSE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+
         console.log('[DB] Tables initialized successfully (utf8mb4)');
     } finally {
         conn.release();

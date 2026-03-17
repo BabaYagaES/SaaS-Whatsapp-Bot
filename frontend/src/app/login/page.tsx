@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
-import { MessageSquare, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { MessageSquare, Mail, Lock, ArrowRight, Loader2, Zap } from "lucide-react";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -37,11 +37,11 @@ export default function LoginPage() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <Link href="/" className="inline-flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 rounded-xl gradient-whatsapp flex items-center justify-center shadow-lg shadow-[var(--color-whatsapp)]/20">
-                            <MessageSquare className="w-6 h-6 text-white" />
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+                            <Zap className="w-6 h-6 text-white fill-white/20" />
                         </div>
-                        <span className="text-2xl font-bold text-white">
-                            Whats<span className="text-[var(--color-whatsapp)]">Bot</span>
+                        <span className="text-3xl font-black text-white tracking-tighter">
+                            Zap<span className="text-green-400">py</span>
                         </span>
                     </Link>
                     <h1 className="text-2xl font-bold text-white mb-2">Bienvenido de vuelta</h1>

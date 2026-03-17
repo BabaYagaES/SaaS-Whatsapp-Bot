@@ -34,11 +34,11 @@ export default function HomePage() {
       <nav className="fixed top-0 w-full z-50 glass">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl gradient-whatsapp flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+              <Zap className="w-5 h-5 text-white fill-white/20" />
             </div>
-            <span className="text-xl font-bold text-white">
-              Whats<span className="text-[var(--color-whatsapp)]">Bot</span>
+            <span className="text-xl font-black text-white tracking-tight">
+              Zap<span className="text-green-400">py</span>
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -62,14 +62,14 @@ export default function HomePage() {
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-dark-800/60 border border-dark-700/50 text-sm text-dark-300 mb-8 animate-fadeIn">
-            <Zap className="w-4 h-4 text-[var(--color-whatsapp)]" />
+            <Zap className="w-4 h-4 text-green-400" />
             Plataforma #1 de Automatización WhatsApp
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6 animate-fadeIn stagger-1">
             Automatiza tu
             <br />
-            <span className="bg-gradient-to-r from-[var(--color-whatsapp)] to-[var(--color-accent-400)] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
               WhatsApp Business
             </span>
           </h1>
@@ -82,7 +82,7 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fadeIn stagger-3">
             <button
               onClick={() => router.push("/register")}
-              className="group flex items-center gap-2 px-8 py-4 text-lg font-semibold text-white gradient-whatsapp rounded-2xl hover:opacity-90 transition-all shadow-2xl shadow-[var(--color-whatsapp)]/25"
+              className="group flex items-center gap-2 px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl hover:opacity-90 transition-all shadow-2xl shadow-green-600/25"
             >
               Comenzar Ahora
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
@@ -200,8 +200,8 @@ export default function HomePage() {
       <footer className="py-8 px-6 border-t border-dark-800/50">
         <div className="max-w-7xl mx-auto flex items-center justify-between text-sm text-dark-500">
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-[var(--color-whatsapp)]" />
-            <span>WhatsBot SaaS</span>
+            <Zap className="w-4 h-4 text-green-400" />
+            <span>Zappy</span>
           </div>
           <p>© 2026 Todos los derechos reservados</p>
         </div>
