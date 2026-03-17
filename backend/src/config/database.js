@@ -97,6 +97,8 @@ async function initDatabase() {
                 user_id VARCHAR(36) NOT NULL,
                 phone VARCHAR(255) NOT NULL,
                 name VARCHAR(255),
+                address TEXT,
+                last_order_details JSON,
                 tags TEXT,
                 notes TEXT,
                 ai_active BOOLEAN DEFAULT FALSE,
@@ -119,6 +121,7 @@ async function initDatabase() {
                 source VARCHAR(255),
                 status VARCHAR(50) DEFAULT 'NEW',
                 notes TEXT,
+                order_data JSON,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -155,6 +158,7 @@ async function initDatabase() {
                 enabled BOOLEAN DEFAULT TRUE,
                 priority INT DEFAULT 0,
                 is_ai BOOLEAN DEFAULT FALSE,
+                media_url TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -163,9 +167,11 @@ async function initDatabase() {
 
         try {
             await conn.query(`ALTER TABLE automations ADD COLUMN is_ai BOOLEAN DEFAULT FALSE AFTER priority`);
-        } catch (e) {
-            // Already exists.
-        }
+        } catch (e) {}
+
+        try {
+            await conn.query(`ALTER TABLE automations ADD COLUMN media_url TEXT AFTER response`);
+        } catch (e) {}
 
         try {
             await conn.query(`ALTER TABLE messages ADD COLUMN media_url TEXT AFTER body`);
@@ -174,18 +180,32 @@ async function initDatabase() {
         }
 
         try {
+            await conn.query(`ALTER TABLE contacts ADD COLUMN address TEXT AFTER name`);
+            await conn.query(`ALTER TABLE contacts ADD COLUMN last_order_details JSON AFTER address`);
+        } catch (e) {}
+
+        try {
+            await conn.query(`ALTER TABLE leads ADD COLUMN order_data JSON AFTER notes`);
+        } catch (e) {}
+
+        try {
             await conn.query(`ALTER TABLE contacts ADD COLUMN ai_active BOOLEAN DEFAULT FALSE AFTER notes`);
             await conn.query(`ALTER TABLE contacts ADD COLUMN last_ai_at DATETIME AFTER ai_active`);
         } catch (e) {}
 
-        try {
-            await conn.query(`ALTER TABLE users ADD COLUMN business_type VARCHAR(100) AFTER avatar`);
-            await conn.query(`ALTER TABLE users ADD COLUMN business_name VARCHAR(255) AFTER business_type`);
-            await conn.query(`ALTER TABLE users ADD COLUMN business_description TEXT AFTER business_name`);
-            console.log('[DB] Business columns added successfully');
-        } catch (e) {
-            // Fields might already exist.
-        }
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS media (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                url TEXT NOT NULL,
+                file_type VARCHAR(50),
+                tags TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
 
         console.log('[DB] Tables initialized successfully (utf8mb4)');
     } finally {

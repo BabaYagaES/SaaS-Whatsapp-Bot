@@ -78,7 +78,15 @@ router.post(
                 return res.status(401).json({ error: { message: 'Invalid email or password' } });
             }
 
-            const user = { id: dbUser.id, email: dbUser.email, name: dbUser.name, plan: dbUser.plan };
+            const user = { 
+                id: dbUser.id, 
+                email: dbUser.email, 
+                name: dbUser.name, 
+                plan: dbUser.plan,
+                businessType: dbUser.business_type,
+                businessName: dbUser.business_name,
+                businessDescription: dbUser.business_description
+            };
             const token = generateToken(user);
 
             res.json({ message: 'Login successful', user, token });
@@ -93,7 +101,7 @@ router.post(
 router.get('/me', authenticate, async (req, res) => {
     try {
         const [rows] = await pool.execute(
-            'SELECT id, email, name, plan, avatar, created_at FROM users WHERE id = ?',
+            'SELECT id, email, name, plan, avatar, business_type, business_name, business_description, created_at FROM users WHERE id = ?',
             [req.user.id]
         );
 

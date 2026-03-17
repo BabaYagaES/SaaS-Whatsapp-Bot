@@ -44,6 +44,12 @@ class ApiClient {
         return this.request<{ leads: any[] }>('/api/leads');
     }
 
+    async deleteLead(id: string) {
+        return this.request<{ message: string }>(`/api/leads/${id}`, {
+            method: 'DELETE',
+        });
+    }
+
     // Auth
     async register(email: string, password: string, name?: string) {
         return this.request<{ user: any; token: string }>('/api/auth/register', {
@@ -151,14 +157,14 @@ class ApiClient {
         return this.request<{ contacts: any[]; pagination: any }>(`/api/contacts?${query}`);
     }
 
-    async createContact(data: { phone: string; name?: string; tags?: string[] }) {
+    async createContact(data: { phone: string; name?: string; address?: string; tags?: string[] }) {
         return this.request<{ contact: any }>('/api/contacts', {
             method: 'POST',
             body: JSON.stringify(data),
         });
     }
 
-    async updateContact(id: string, data: { name?: string; tags?: string[]; notes?: string }) {
+    async updateContact(id: string, data: { name?: string; address?: string; tags?: string[]; notes?: string }) {
         return this.request<{ contact: any }>(`/api/contacts/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
@@ -235,6 +241,24 @@ class ApiClient {
 
     async getMessagesByHour() {
         return this.request<{ messagesByHour: any[] }>('/api/reports/messages-by-hour');
+    }
+
+    // Media Gallery
+    async getMedia() {
+        return this.request<{ media: any[] }>('/api/media');
+    }
+
+    async uploadMedia(data: { name: string; mediaBase64: string; mediaMimeType: string; tags?: string }) {
+        return this.request<{ item: any }>('/api/media', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async deleteMedia(id: string) {
+        return this.request<{ message: string }>(`/api/media/${id}`, {
+            method: 'DELETE',
+        });
     }
 }
 

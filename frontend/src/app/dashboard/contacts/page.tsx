@@ -14,12 +14,14 @@ import {
     Loader2,
     MessageSquare,
     User,
+    MapPin,
 } from "lucide-react";
 
 interface Contact {
     id: string;
     phone: string;
     name: string | null;
+    address: string | null;
     tags: string | string[];
     notes: string | null;
     createdAt: string;
@@ -37,7 +39,7 @@ export default function ContactsPage() {
     const [search, setSearch] = useState("");
     const [showAdd, setShowAdd] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [formData, setFormData] = useState({ phone: "", name: "", tags: "" });
+    const [formData, setFormData] = useState({ phone: "", name: "", tags: "", address: "" });
     const [saving, setSaving] = useState(false);
 
     const loadContacts = async () => {
@@ -62,10 +64,11 @@ export default function ContactsPage() {
             await api.createContact({
                 phone: formData.phone,
                 name: formData.name || undefined,
+                address: formData.address || undefined,
                 tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : undefined,
             });
             setShowAdd(false);
-            setFormData({ phone: "", name: "", tags: "" });
+            setFormData({ phone: "", name: "", tags: "", address: "" });
             loadContacts();
         } catch (err: any) {
             alert(err.message);
@@ -79,10 +82,11 @@ export default function ContactsPage() {
         try {
             await api.updateContact(id, {
                 name: formData.name || undefined,
+                address: formData.address || undefined,
                 tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : undefined,
             });
             setEditingId(null);
-            setFormData({ phone: "", name: "", tags: "" });
+            setFormData({ phone: "", name: "", tags: "", address: "" });
             loadContacts();
         } catch (err: any) {
             alert(err.message);
@@ -106,6 +110,7 @@ export default function ContactsPage() {
         setFormData({
             phone: contact.phone,
             name: contact.name || "",
+            address: contact.address || "",
             tags: parseTags(contact.tags).join(", "),
         });
     };
@@ -126,7 +131,7 @@ export default function ContactsPage() {
                 <button
                     onClick={() => {
                         setShowAdd(true);
-                        setFormData({ phone: "", name: "", tags: "" });
+                        setFormData({ phone: "", name: "", tags: "", address: "" });
                     }}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-white gradient-primary hover:opacity-90 transition-all shadow-lg shadow-primary-600/20"
                 >
@@ -177,6 +182,13 @@ export default function ContactsPage() {
                             onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                             placeholder="Tags (separadas por coma)"
                             className="px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white placeholder-dark-500 focus:outline-none focus:border-primary-500 transition-all"
+                        />
+                        <input
+                            type="text"
+                            value={formData.address}
+                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                            placeholder="Dirección"
+                            className="sm:col-span-3 px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white placeholder-dark-500 focus:outline-none focus:border-primary-500 transition-all"
                         />
                     </div>
                     <button
@@ -237,6 +249,13 @@ export default function ContactsPage() {
                                         placeholder="Tags"
                                         className="w-full px-3 py-2 rounded-lg bg-dark-900/60 border border-dark-700/50 text-sm text-white focus:outline-none focus:border-primary-500 transition-all"
                                     />
+                                    <input
+                                        type="text"
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                        placeholder="Dirección"
+                                        className="w-full px-3 py-2 rounded-lg bg-dark-900/60 border border-dark-700/50 text-sm text-white focus:outline-none focus:border-primary-500 transition-all"
+                                    />
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => handleEdit(contact.id)}
@@ -270,6 +289,12 @@ export default function ContactsPage() {
                                                     <Phone className="w-3.5 h-3.5" />
                                                     {contact.phone}
                                                 </p>
+                                                {contact.address && (
+                                                    <p className="text-xs text-dark-400 flex items-start gap-1 mt-1 italic line-clamp-1">
+                                                        <MapPin className="w-3 h-3 mt-0.5" />
+                                                        {contact.address}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

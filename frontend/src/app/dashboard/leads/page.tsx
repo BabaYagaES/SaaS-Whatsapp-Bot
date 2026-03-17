@@ -11,9 +11,20 @@ import {
     Clock,
     Search,
     Filter,
+    Trash2,
+    CheckCircle,
+    Loader2,
+    Package,
+    MapPin,
     ArrowUpRight,
-    Loader2
 } from "lucide-react";
+
+interface OrderData {
+    name?: string;
+    product?: string;
+    address?: string;
+    total?: string;
+}
 
 interface Lead {
     id: string;
@@ -22,7 +33,9 @@ interface Lead {
     source: string;
     status: string;
     notes: string;
+    orderData?: OrderData | string;
     createdAt: string;
+    updatedAt: string;
 }
 
 export default function LeadsPage() {
@@ -42,6 +55,16 @@ export default function LeadsPage() {
             console.error("Error loading leads:", err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("¿Eliminar este registro de pedido?")) return;
+        try {
+            await api.deleteLead(id);
+            setLeads(prev => prev.filter(l => l.id !== id));
+        } catch (err) {
+            console.error("Error deleting lead:", err);
         }
     };
 
@@ -114,60 +137,121 @@ export default function LeadsPage() {
                                 <tr>
                                     <td colSpan={5} className="px-6 py-12 text-center">
                                         <Loader2 className="w-8 h-8 animate-spin text-primary-500 mx-auto mb-2" />
-                                        <span className="text-dark-500">Cargando pedidos...</span>
+                                        <span className="text-dark-500 font-medium">Cargando pedidos...</span>
                                     </td>
                                 </tr>
                             ) : filteredLeads.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-12 text-center">
-                                        <div className="w-12 h-12 rounded-2xl bg-dark-800 flex items-center justify-center mx-auto mb-4">
-                                            <FileText className="w-6 h-6 text-dark-600" />
+                                        <div className="w-12 h-12 rounded-2xl bg-dark-800/50 flex items-center justify-center mx-auto mb-4 border border-dark-700/30">
+                                            <FileText className="w-6 h-6 text-dark-500" />
                                         </div>
                                         <p className="text-white font-medium">No hay pedidos registrados</p>
-                                        <p className="text-dark-500 text-xs mt-1">La IA registrará pedidos automáticamente cuando los detecte en el chat.</p>
+                                        <p className="text-dark-500 text-xs mt-1">La IA registrará pedidos automáticamente cuando los detecte.</p>
                                     </td>
                                 </tr>
-                            ) : filteredLeads.map((lead) => (
-                                <tr key={lead.id} className="hover:bg-dark-800/40 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full bg-primary-500/10 flex items-center justify-center text-primary-500 font-bold border border-primary-500/20">
-                                                {lead.contactName?.[0]?.toUpperCase() || <User className="w-4 h-4" />}
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-white">{lead.contactName || "Sin Nombre"}</p>
-                                                <p className="text-xs text-dark-500 flex items-center gap-1 mt-0.5">
-                                                    <Phone className="w-3 h-3" /> {lead.contactPhone}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="max-w-xs">
-                                            <p className="text-dark-200 line-clamp-2">{lead.notes?.replace('Pedido detectado:', '').trim() || "Datos variados"}</p>
-                                            <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded bg-primary-500/10 text-[10px] text-primary-400 font-bold uppercase tracking-tighter">
-                                                {lead.source}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-warning-500/10 text-warning-500 border border-warning-500/20 uppercase tracking-wider">
-                                            {lead.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col text-xs text-dark-400">
-                                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleDateString()}</span>
-                                            <span className="flex items-center gap-1 mt-1 text-dark-500"><Clock className="w-3 h-3" /> {new Date(lead.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <button className="p-2 rounded-lg bg-dark-800 text-dark-400 hover:text-white border border-dark-700 transition-all opacity-0 group-hover:opacity-100">
-                                            <ArrowUpRight className="w-4 h-4" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                            ) : (() => {
+                                // Deduplicate repeated consecutive records from the same contact for the view
+                                let lastKey = "";
+                                return filteredLeads.map((lead, idx) => {
+                                    let d: OrderData = {};
+                                    if (lead.orderData) {
+                                        try {
+                                            d = typeof lead.orderData === 'string' ? JSON.parse(lead.orderData) : lead.orderData;
+                                        } catch (e) {}
+                                    } else if (lead.notes?.includes('{')) {
+                                        try {
+                                            const jsonStr = lead.notes.substring(lead.notes.indexOf('{'));
+                                            d = JSON.parse(jsonStr);
+                                        } catch (e) {}
+                                    }
+                                    
+                                    // Use contact + product/notes as key for deduplication
+                                    const currentKey = `${lead.contactPhone}-${d.product || lead.notes}`;
+                                    const isDuplicate = currentKey === lastKey;
+                                    lastKey = currentKey;
+
+                                    if (isDuplicate) return null;
+
+                                    return (
+                                        <tr key={lead.id} className="hover:bg-dark-800/30 transition-colors group">
+                                            <td className="px-6 py-6 align-top">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600/20 to-accent-600/20 flex items-center justify-center text-primary-400 font-bold border border-primary-500/20">
+                                                        {lead.contactName?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-white text-base tracking-tight">{lead.contactName || "Sin Nombre"}</p>
+                                                        <p className="text-xs text-dark-500 flex items-center gap-1.5 mt-0.5 font-medium">
+                                                            <Phone className="w-3.5 h-3.5" /> {lead.contactPhone}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-6 font-semibold">
+                                                <div className="max-w-xs space-y-2">
+                                                    {d.product || d.address || d.total ? (
+                                                        <div className="space-y-2 py-1">
+                                                            {d.product && (
+                                                                <div className="flex items-center gap-2.5">
+                                                                    <div className="w-7 h-7 rounded-lg bg-primary-500/10 flex items-center justify-center border border-primary-500/10">
+                                                                        <Package className="w-4 h-4 text-primary-400" />
+                                                                    </div>
+                                                                    <span className="text-white font-semibold text-sm">{d.product}</span>
+                                                                </div>
+                                                            )}
+                                                            {d.address && (
+                                                                <div className="flex gap-2.5 bg-dark-800/40 p-2.5 rounded-xl border border-dark-700/30">
+                                                                    <MapPin className="w-4 h-4 text-accent-400 mt-0.5 shrink-0" /> 
+                                                                    <span className="text-dark-200 text-xs leading-relaxed">{d.address}</span>
+                                                                </div>
+                                                            )}
+                                                            {d.total && (
+                                                                <div className="flex items-center gap-2 mt-1 px-1">
+                                                                    <CheckCircle className="w-3.5 h-3.5 text-accent-500" />
+                                                                    <span className="text-xs font-bold text-accent-400 uppercase tracking-wider">Total: {d.total}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-dark-400 text-xs italic bg-dark-800/20 p-2 rounded-lg">{lead.notes?.replace('Pedido detectado:', '').trim()}</p>
+                                                    )}
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-500/10 text-[9px] text-primary-400 font-black uppercase tracking-widest border border-primary-500/10">
+                                                            {lead.source}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-6 align-top">
+                                                <span className="px-3 py-1 rounded-lg text-[10px] font-black bg-warning-500/10 text-warning-400 border border-warning-500/20 uppercase tracking-widest">
+                                                    {lead.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-6 align-top">
+                                                <div className="flex flex-col text-xs text-dark-400 font-medium">
+                                                    <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-dark-500" /> {new Date(lead.createdAt).toLocaleDateString()}</span>
+                                                    <span className="flex items-center gap-1.5 mt-1.5 text-dark-500 font-normal"><Clock className="w-3.5 h-3.5 opacity-50" /> {new Date(lead.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-6 text-right align-top">
+                                                <div className="flex items-center justify-end gap-2 text-dark font-semibold">
+                                                    <button 
+                                                        onClick={() => handleDelete(lead.id)}
+                                                        className="p-2.5 rounded-xl bg-dark-800/50 text-dark-500 hover:text-danger-400 hover:bg-danger-500/10 border border-dark-700/30 transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Eliminar registro"
+                                                    >
+                                                        <Trash2 className="w-4.5 h-4.5" />
+                                                    </button>
+                                                    <button className="p-2.5 rounded-xl bg-primary-500/10 text-primary-400 hover:text-white hover:bg-primary-500 border border-primary-500/10 transition-all opacity-0 group-hover:opacity-100">
+                                                        <ArrowUpRight className="w-4.5 h-4.5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                });
+                            })()}
                         </tbody>
                     </table>
                 </div>

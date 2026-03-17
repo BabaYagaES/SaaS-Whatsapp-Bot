@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
 // POST /api/contacts
 router.post('/', checkContactLimit, async (req, res) => {
     try {
-        const { phone, name, tags, notes } = req.body;
+        const { phone, name, tags, notes, address } = req.body;
         if (!phone) {
             return res.status(400).json({ error: { message: 'Phone number is required' } });
         }
@@ -73,8 +73,8 @@ router.post('/', checkContactLimit, async (req, res) => {
 
         const id = generateId();
         await pool.execute(
-            'INSERT INTO contacts (id, user_id, phone, name, tags, notes) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, req.user.id, phone, name || null, tags ? JSON.stringify(tags) : '[]', notes || null]
+            'INSERT INTO contacts (id, user_id, phone, name, tags, notes, address) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.id, phone, name || null, tags ? JSON.stringify(tags) : '[]', notes || null, address || null]
         );
 
         const [[row]] = await pool.execute('SELECT * FROM contacts WHERE id = ?', [id]);
@@ -88,7 +88,7 @@ router.post('/', checkContactLimit, async (req, res) => {
 // PUT /api/contacts/:id
 router.put('/:id', async (req, res) => {
     try {
-        const { name, tags, notes } = req.body;
+        const { name, tags, notes, address } = req.body;
 
         const [existing] = await pool.execute(
             'SELECT id FROM contacts WHERE id = ? AND user_id = ?',
@@ -103,6 +103,7 @@ router.put('/:id', async (req, res) => {
         if (name !== undefined) { fields.push('name = ?'); values.push(name); }
         if (tags) { fields.push('tags = ?'); values.push(JSON.stringify(tags)); }
         if (notes !== undefined) { fields.push('notes = ?'); values.push(notes); }
+        if (address !== undefined) { fields.push('address = ?'); values.push(address); }
 
         if (fields.length > 0) {
             values.push(req.params.id);

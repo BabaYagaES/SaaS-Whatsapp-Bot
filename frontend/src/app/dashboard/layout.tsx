@@ -19,7 +19,8 @@ import {
     X,
     ChevronLeft,
     Zap,
-    Bell
+    Bell,
+    Image as ImageIcon
 } from "lucide-react";
 
 const navItems = [
@@ -29,6 +30,7 @@ const navItems = [
     { href: "/dashboard/contacts", icon: Users, label: "Contactos" },
     { href: "/dashboard/automations", icon: Bot, label: "Automatizaciones" },
     { href: "/dashboard/leads", icon: BarChart3, label: "Pedidos IA" },
+    { href: "/dashboard/gallery", icon: ImageIcon, label: "Galería" },
     { href: "/dashboard/settings", icon: Settings, label: "Configuración" },
 ];
 

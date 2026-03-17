@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
     Bot, Plus, Edit3, Trash2, ToggleLeft, ToggleRight,
-    X, Loader2, Zap, ArrowRight, AlertCircle, Check, Crown
+    X, Loader2, Zap, ArrowRight, AlertCircle, Check, Crown,
+    Image as ImageIcon, Paperclip, FileText, Music
 } from "lucide-react";
 
 interface Automation {
@@ -16,6 +17,7 @@ interface Automation {
     enabled: boolean;
     priority: number;
     isAi: boolean;
+    mediaUrl?: string;
 }
 
 const matchLabels: Record<string, string> = {
@@ -33,13 +35,17 @@ export default function AutomationsPage() {
         name: "", trigger: "", response: "",
         matchType: "CONTAINS", priority: 0,
         isAi: false,
+        mediaUrl: "",
+        mediaBase64: "",
+        mediaName: "",
+        mediaMimeType: "",
     });
 
     const [errorModal, setErrorModal] = useState<{message: string, isUpgrade: boolean} | null>(null);
     const [confirmModal, setConfirmModal] = useState<{id: string, message: string} | null>(null);
 
     const handleError = (e: any) => {
-        const msg = e.message || "Ocurrió un error inesperado";
+        const msg = e.response?.data?.error?.message || e.message || "Ocurrió un error inesperado";
         setErrorModal({
             message: msg,
             isUpgrade: msg.toLowerCase().includes("upgrade") || msg.toLowerCase().includes("límite")
@@ -57,17 +63,23 @@ export default function AutomationsPage() {
     useEffect(() => { load(); }, []);
 
     const reset = () => {
-        setForm({ name: "", trigger: "", response: "", matchType: "CONTAINS", priority: 0, isAi: false });
-        setEditId(null); setShowForm(false);
+        setForm({ 
+            name: "", trigger: "", response: "", 
+            matchType: "CONTAINS", priority: 0, isAi: false,
+            mediaUrl: "", mediaBase64: "", mediaName: "", mediaMimeType: ""
+        });
+        setEditId(null); 
+        setShowForm(false);
     };
 
     const save = async () => {
-        if (!form.name || !form.trigger || !form.response) return;
+        if (!form.name || !form.trigger) return;
         setSaving(true);
         try {
             if (editId) await api.updateAutomation(editId, form);
             else await api.createAutomation(form);
-            reset(); load();
+            reset(); 
+            load();
         } catch (e: any) { handleError(e); }
         finally { setSaving(false); }
     };
@@ -95,8 +107,41 @@ export default function AutomationsPage() {
     };
 
     const edit = (a: Automation) => {
-        setForm({ name: a.name, trigger: a.trigger, response: a.response, matchType: a.matchType, priority: a.priority, isAi: a.isAi });
-        setEditId(a.id); setShowForm(true);
+        setForm({ 
+            name: a.name, trigger: a.trigger, response: a.response, 
+            matchType: a.matchType, priority: a.priority, isAi: a.isAi,
+            mediaUrl: a.mediaUrl || "", mediaBase64: "", mediaName: "", mediaMimeType: ""
+        });
+        setEditId(a.id); 
+        setShowForm(true);
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            setForm({
+                ...form,
+                mediaBase64: base64.split(',')[1],
+                mediaName: file.name,
+                mediaMimeType: file.type,
+                mediaUrl: base64 // Preview only
+            });
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const removeFile = () => {
+        setForm({
+            ...form,
+            mediaUrl: "",
+            mediaBase64: "",
+            mediaName: "",
+            mediaMimeType: ""
+        });
     };
 
     const renderErrorModal = () => {
@@ -126,41 +171,6 @@ export default function AutomationsPage() {
                         <p className="text-dark-300 text-center text-sm mb-6">
                             {errorModal.message}
                         </p>
-
-                        {errorModal.isUpgrade && (
-                            <div className="space-y-3 mb-6">
-                                <div className="p-4 rounded-xl bg-dark-800 border border-primary-500/30 relative overflow-hidden group hover:border-primary-500 transition-all cursor-pointer">
-                                    <div className="absolute top-0 right-0 px-2 py-0.5 bg-primary-500 text-white text-[10px] font-bold rounded-bl-lg">
-                                        RECOMENDADO
-                                    </div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h4 className="font-bold text-white">Plan Starter</h4>
-                                        <div className="text-right">
-                                            <span className="text-lg font-bold text-white">$10</span>
-                                            <span className="text-xs text-dark-400">/mes</span>
-                                        </div>
-                                    </div>
-                                    <ul className="text-xs text-dark-300 space-y-1">
-                                        <li className="flex items-center gap-1"><Check className="w-3 h-3 text-primary-500" /> Hasta 10 automatizaciones</li>
-                                        <li className="flex items-center gap-1"><Check className="w-3 h-3 text-primary-500" /> 1000 mensajes / mes</li>
-                                    </ul>
-                                </div>
-                                
-                                <div className="p-4 rounded-xl bg-dark-800 border border-dark-700 hover:border-primary-400 transition-all cursor-pointer">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h4 className="font-bold text-white">Plan Pro</h4>
-                                        <div className="text-right">
-                                            <span className="text-lg font-bold text-white">$29</span>
-                                            <span className="text-xs text-dark-400">/mes</span>
-                                        </div>
-                                    </div>
-                                    <ul className="text-xs text-dark-300 space-y-1">
-                                        <li className="flex items-center gap-1"><Check className="w-3 h-3 text-primary-500" /> Automatizaciones ilimitadas</li>
-                                        <li className="flex items-center gap-1"><Check className="w-3 h-3 text-primary-500" /> Mensajes ilimitados</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        )}
 
                         <div className="flex gap-3">
                             <button 
@@ -284,6 +294,43 @@ export default function AutomationsPage() {
                                 placeholder={form.isAi ? "Ej: Saluda cordialmente y ofrece el menú..." : "Ej: ¡Hola! Aquí tienes nuestro catálogo..."} rows={3}
                                 className="w-full px-4 py-3 rounded-xl bg-dark-800/80 border border-dark-700/50 text-white placeholder-dark-500 focus:outline-none focus:border-primary-500 transition-all resize-none" />
                         </div>
+
+                        {/* File Upload Section */}
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-dark-300 mb-1.5">Archivo / Imagen Adjunta</label>
+                            {form.mediaUrl ? (
+                                <div className="relative group w-full aspect-video rounded-xl overflow-hidden border border-dark-700 bg-dark-900 flex items-center justify-center">
+                                    {(form.mediaMimeType?.includes('image') || form.mediaUrl.startsWith('data:image')) ? (
+                                        <img src={form.mediaUrl} alt="Preview" className="w-full h-full object-contain" />
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-2 text-dark-400">
+                                            <Paperclip className="w-10 h-10" />
+                                            <span className="text-xs">{form.mediaName || "Archivo adjunto"}</span>
+                                        </div>
+                                    )}
+                                    <button 
+                                        onClick={removeFile}
+                                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/80 text-white hover:bg-red-600 transition-all"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex gap-4">
+                                    <label className="flex-1 border-2 border-dashed border-dark-700 rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:border-primary-500/50 hover:bg-primary-500/5 transition-all cursor-pointer group">
+                                        <input type="file" onChange={handleFileChange} className="hidden" accept="image/*,application/pdf,audio/mpeg" />
+                                        <div className="w-10 h-10 rounded-full bg-dark-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <ImageIcon className="w-5 h-5 text-dark-400 group-hover:text-primary-400" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-sm font-medium text-white">Subir archivo</p>
+                                            <p className="text-xs text-dark-500">Imagen, PDF o Audio</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="flex items-center justify-between p-4 rounded-xl bg-primary-500/5 border border-primary-500/20">
                             <div>
                                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -298,20 +345,11 @@ export default function AutomationsPage() {
                                 {form.isAi ? <ToggleRight className="w-9 h-9 text-primary-500 shrink-0" /> : <ToggleLeft className="w-9 h-9 text-dark-600 shrink-0" />}
                             </button>
                         </div>
-                        <div className="p-4 rounded-xl bg-dark-900/60 border border-dark-700/30">
-                            <p className="text-xs text-dark-500 mb-2 flex items-center gap-1"><Zap className="w-3.5 h-3.5" /> Vista previa</p>
-                            <div className="flex items-center gap-2 text-sm">
-                                <span className="px-2 py-1 rounded-lg bg-dark-800 text-dark-400">{form.trigger || "trigger"}</span>
-                                <ArrowRight className="w-4 h-4 text-dark-600" />
-                                <span className="px-2 py-1 rounded-lg bg-primary-600/15 text-primary-300 truncate max-w-[300px]">
-                                    {form.response || "respuesta"}
-                                </span>
-                            </div>
-                        </div>
-                        <button onClick={save} disabled={saving || !form.name || !form.trigger || !form.response}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-white gradient-primary hover:opacity-90 transition-all disabled:opacity-50">
+
+                        <button onClick={save} disabled={saving || !form.name || !form.trigger}
+                            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-white gradient-primary hover:opacity-90 transition-all disabled:opacity-50">
                             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                            {editId ? "Actualizar" : "Crear"}
+                            {editId ? "Actualizar Automatización" : "Crear Automatización"}
                         </button>
                     </div>
                 </div>
@@ -342,41 +380,73 @@ export default function AutomationsPage() {
                     </button>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {items.map((a, i) => (
-                        <div key={a.id} className={`group p-5 rounded-2xl glass-light hover:bg-dark-800/60 transition-all animate-fadeIn ${!a.enabled ? "opacity-60" : ""}`}
+                        <div key={a.id} className={`group p-5 rounded-2xl glass-light hover:bg-dark-800/60 border border-transparent hover:border-dark-700/50 transition-all animate-fadeIn ${!a.enabled ? "opacity-60" : ""}`}
                             style={{ animationDelay: `${i * 0.05}s` }}>
-                            <div className="flex items-start gap-4">
-                                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${a.enabled ? "bg-warning-500/15" : "bg-dark-700/50"}`}>
-                                    <Zap className={`w-5 h-5 ${a.enabled ? "text-warning-500" : "text-dark-500"}`} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-1">
-                                        <h3 className="font-semibold text-white">{a.name}</h3>
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2 py-0.5 rounded-md bg-dark-700/60 text-xs text-dark-400">{matchLabels[a.matchType]}</span>
-                                            {a.isAi && (
-                                                <span className="px-2 py-0.5 rounded-md bg-primary-500/20 text-[10px] font-bold text-primary-400 flex items-center gap-1 border border-primary-500/20 uppercase tracking-wider">
-                                                    <Zap className="w-2.5 h-2.5" /> IA
-                                                </span>
-                                            )}
+                            <div className="flex flex-col h-full">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${a.enabled ? "bg-warning-500/15" : "bg-dark-700/50"}`}>
+                                            <Zap className={`w-5 h-5 ${a.enabled ? "text-warning-500" : "text-dark-500"}`} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold text-white leading-tight">{a.name}</h3>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="px-1.5 py-0.5 rounded bg-dark-700/60 text-[10px] text-dark-400 uppercase font-medium">{matchLabels[a.matchType]}</span>
+                                                {a.isAi && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-primary-500/20 text-[10px] font-bold text-primary-400 flex items-center gap-1 border border-primary-500/20 uppercase tracking-wider">
+                                                        <Zap className="w-2 h-2" /> IA
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-2 text-sm">
-                                        <span className="px-2.5 py-1 rounded-lg bg-dark-800 text-dark-300 font-mono text-xs">&quot;{a.trigger}&quot;</span>
-                                        <ArrowRight className="w-4 h-4 text-dark-600" />
-                                        <span className="px-2.5 py-1 rounded-lg bg-primary-600/10 text-primary-300 text-xs truncate max-w-[300px]">{a.response}</span>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => edit(a)} className="p-2 rounded-lg text-dark-500 hover:text-white hover:bg-dark-800 transition-all">
+                                            <Edit3 className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => promptDelete(a.id)} className="p-2 rounded-lg text-dark-500 hover:text-danger-500 hover:bg-danger-500/10 transition-all">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <button onClick={() => toggle(a.id)} className="p-1 rounded-lg transition-all">
+
+                                <div className="space-y-3 flex-1">
+                                    <div className="text-xs">
+                                        <p className="text-dark-500 mb-1 flex items-center gap-1 uppercase tracking-tighter font-bold">Si el mensaje:</p>
+                                        <div className="px-3 py-2 rounded-xl bg-dark-900/60 border border-dark-800 text-dark-300 font-medium">
+                                            {a.trigger}
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs">
+                                        <p className="text-dark-500 mb-1 flex items-center gap-1 uppercase tracking-tighter font-bold">Enviar:</p>
+                                        <div className="px-3 py-2 rounded-xl bg-primary-500/5 border border-primary-500/10 text-primary-300 whitespace-pre-wrap">
+                                            {a.response || "No response text"}
+                                        </div>
+                                    </div>
+
+                                    {a.mediaUrl && (
+                                        <div className="mt-2 rounded-xl overflow-hidden border border-dark-800 bg-dark-900/40 aspect-[2/1] relative group/media">
+                                            {a.mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) || a.mediaUrl.includes('image') ? (
+                                                <img src={a.mediaUrl} alt="Attached" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-dark-500">
+                                                    {a.mediaUrl.match(/\.(mp3|wav|ogg)/i) ? <Music className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
+                                                    <span className="text-[10px]">Archivo Adjunto</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 pt-4 border-t border-dark-800/50 flex items-center justify-between">
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${a.enabled ? "text-[var(--color-whatsapp)]" : "text-dark-500"}`}>
+                                        {a.enabled ? "Activa" : "Inactiva"}
+                                    </span>
+                                    <button onClick={() => toggle(a.id)} className="transition-all">
                                         {a.enabled ? <ToggleRight className="w-8 h-8 text-[var(--color-whatsapp)]" /> : <ToggleLeft className="w-8 h-8 text-dark-600" />}
-                                    </button>
-                                    <button onClick={() => edit(a)} className="p-2 rounded-lg text-dark-600 hover:text-white hover:bg-dark-700 transition-all opacity-0 group-hover:opacity-100">
-                                        <Edit3 className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={() => promptDelete(a.id)} className="p-2 rounded-lg text-dark-600 hover:text-danger-500 hover:bg-danger-500/10 transition-all opacity-0 group-hover:opacity-100">
-                                        <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>

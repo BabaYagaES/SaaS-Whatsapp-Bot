@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { whatsappManager } = require('../../lib/whatsapp');
 const { pool, generateId, toCamelCase } = require('../../config/database');
 const { generateResponse, conversationMemory } = require('../../lib/ai');
@@ -153,10 +155,35 @@ async function processAutomations(userId, sessionId, from, body) {
                         );
                     } else {
                         // Regular fixed response
-                        await whatsappManager.sendMessage(sessionId, from, auto.response);
+                        let mediaBase64 = null;
+                        let mediaMimeType = null;
+                        let mediaName = null;
+
+                        if (auto.media_url) {
+                            try {
+                                if (auto.media_url.includes('/uploads/')) {
+                                    const fileName = auto.media_url.split('/').pop();
+                                    const filePath = path.resolve(__dirname, '../../../../public/uploads', fileName);
+                                    if (fs.existsSync(filePath)) {
+                                        const fileBuffer = fs.readFileSync(filePath);
+                                        mediaBase64 = fileBuffer.toString('base64');
+                                        const ext = path.extname(fileName).toLowerCase();
+                                        mediaMimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 
+                                                        ext === '.png' ? 'image/png' : 
+                                                        ext === '.pdf' ? 'application/pdf' : 
+                                                        ext === '.mp3' ? 'audio/mpeg' : 'application/octet-stream';
+                                        mediaName = fileName;
+                                    }
+                                }
+                            } catch (err) {
+                                console.error('[Automation] Error preparing media:', err);
+                            }
+                        }
+
+                        await whatsappManager.sendMessage(sessionId, from, auto.response, mediaBase64, mediaMimeType, mediaName);
                         await pool.execute(
-                            'INSERT INTO messages (id, session_id, contact_id, direction, body, status) VALUES (?, ?, ?, ?, ?, ?)',
-                            [generateId(), sessionId, contact.id, 'OUTBOUND', auto.response, 'SENT']
+                            'INSERT INTO messages (id, session_id, contact_id, direction, body, media_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                            [generateId(), sessionId, contact.id, 'OUTBOUND', auto.response || '', auto.media_url || null, 'SENT']
                         );
                         return; // Done
                     }
@@ -180,13 +207,49 @@ async function processAutomations(userId, sessionId, from, body) {
             // Get the full in-memory history for this conversation
             const history = conversationMemory.get(userId, phone);
 
+            // Get gallery items
+            const [gallery] = await pool.execute(
+                'SELECT name, tags, url FROM media WHERE user_id = ?',
+                [userId]
+            );
+
             let aiResponse = await generateResponse(history, {
                 businessName: biz.business_name,
                 businessType: biz.business_type,
-                businessDescription: biz.business_description
+                businessDescription: biz.business_description,
+                gallery: gallery.map(g => ({ name: g.name, tags: g.tags, url: g.url }))
             });
 
-            // 4. Extract Lead/Order Data if present
+            // 4. Extract Gallery Media if present
+            let aiMediaUrl = null;
+            let aiMediaBase64 = null;
+            let aiMediaMimeType = null;
+            let aiMediaName = null;
+
+            const mediaMatch = aiResponse.match(/\[\[SEND_MEDIA:\s*"?(.*?)"?\]\]/);
+            if (mediaMatch) {
+                aiMediaUrl = mediaMatch[1].trim();
+                aiResponse = aiResponse.replace(mediaMatch[0], '').trim();
+
+                try {
+                    const fileName = aiMediaUrl.split('/').pop();
+                    const filePath = path.resolve(__dirname, '../../../../public/uploads', fileName);
+                    if (fs.existsSync(filePath)) {
+                        const fileBuffer = fs.readFileSync(filePath);
+                        aiMediaBase64 = fileBuffer.toString('base64');
+                        const ext = path.extname(fileName).toLowerCase();
+                        aiMediaMimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 
+                                        ext === '.png' ? 'image/png' : 
+                                        ext === '.pdf' ? 'application/pdf' : 
+                                        ext === '.mp3' ? 'audio/mpeg' : 'application/octet-stream';
+                        aiMediaName = fileName;
+                    }
+                } catch (err) {
+                    console.error('[AI] Error preparing gallery media:', err);
+                }
+            }
+
+            // 5. Extract Lead/Order Data if present
             const orderMatch = aiResponse.match(/\[\[ORDER_DATA:\s*({[\s\S]*?})\]\]/);
             if (orderMatch) {
                 try {
@@ -194,13 +257,51 @@ async function processAutomations(userId, sessionId, from, body) {
                     // Clean response message to user
                     aiResponse = aiResponse.replace(orderMatch[0], '').trim();
                     
-                    // Save to leads table
-                    await pool.execute(
-                        'INSERT INTO leads (id, user_id, contact_id, source, notes) VALUES (?, ?, ?, ?, ?)',
-                        [generateId(), userId, contact.id, 'WhatsApp AI', `Pedido detectado: ${JSON.stringify(orderData)}`]
+                    // Check for a recent lead for this contact (last 30 mins) to avoid duplicates
+                    const [recentLeads] = await pool.execute(
+                        'SELECT id FROM leads WHERE contact_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE) ORDER BY created_at DESC LIMIT 1',
+                        [contact.id]
                     );
-                    // Mark contact as lead
-                    await pool.execute('UPDATE contacts SET is_lead = TRUE WHERE id = ?', [contact.id]);
+
+                    if (recentLeads.length > 0) {
+                        // Update existing lead
+                        await pool.execute(
+                            'UPDATE leads SET notes = ?, order_data = ?, updated_at = NOW() WHERE id = ?',
+                            [`Pedido detectado: ${orderData.product || 'Varios'}`, JSON.stringify(orderData), recentLeads[0].id]
+                        );
+                    } else {
+                        // Save new lead
+                        await pool.execute(
+                            'INSERT INTO leads (id, user_id, contact_id, source, notes, order_data) VALUES (?, ?, ?, ?, ?, ?)',
+                            [generateId(), userId, contact.id, 'WhatsApp AI', `Pedido detectado: ${orderData.product || 'Varios'}`, JSON.stringify(orderData)]
+                        );
+                    }
+
+                    // Update contact info with latest address and last order details
+                    const updates = [];
+                    const params = [];
+                    
+                    if (orderData.address) {
+                        updates.push('address = ?');
+                        params.push(orderData.address);
+                    }
+                    if (orderData.name && !contact.name) {
+                        updates.push('name = ?');
+                        params.push(orderData.name);
+                    }
+                    
+                    updates.push('last_order_details = ?');
+                    params.push(JSON.stringify(orderData));
+                    
+                    updates.push('is_lead = TRUE');
+
+                    if (updates.length > 0) {
+                        params.push(contact.id);
+                        await pool.execute(
+                            `UPDATE contacts SET ${updates.join(', ')} WHERE id = ?`,
+                            params
+                        );
+                    }
                 } catch (e) {
                     console.error('[AI] Lead extraction failed:', e);
                 }
@@ -210,14 +311,14 @@ async function processAutomations(userId, sessionId, from, body) {
             conversationMemory.add(userId, phone, 'assistant', aiResponse);
 
             // 5. Send and Save
-            await whatsappManager.sendMessage(sessionId, from, aiResponse);
+            await whatsappManager.sendMessage(sessionId, from, aiResponse, aiMediaBase64, aiMediaMimeType, aiMediaName);
             await pool.execute(
                 'UPDATE contacts SET last_ai_at = NOW() WHERE id = ?',
                 [contact.id]
             );
             await pool.execute(
-                'INSERT INTO messages (id, session_id, contact_id, direction, body, status) VALUES (?, ?, ?, ?, ?, ?)',
-                [generateId(), sessionId, contact.id, 'OUTBOUND', aiResponse, 'SENT']
+                'INSERT INTO messages (id, session_id, contact_id, direction, body, media_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [generateId(), sessionId, contact.id, 'OUTBOUND', aiResponse, aiMediaUrl, 'SENT']
             );
         }
 

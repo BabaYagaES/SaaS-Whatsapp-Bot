@@ -19,6 +19,7 @@ const automationRoutes = require('./modules/automations/automations.routes');
 const reportRoutes = require('./modules/reports/reports.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
 const leadRoutes = require('./modules/leads/leads.routes');
+const mediaRoutes = require('./modules/media/media.routes');
 
 // WhatsApp Manager & Socket setup
 const { setupWhatsAppEvents } = require('./modules/whatsapp/whatsapp.socket');
@@ -88,6 +89,7 @@ app.use('/api/automations', automationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/media', mediaRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
